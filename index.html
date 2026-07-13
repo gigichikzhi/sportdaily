@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>萌娃寒假运动打卡 Netlify云端版</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI}
+body{background:#f7fbff;padding:12px;max-width:750px;margin:0 auto;padding-bottom:80px}
+.title{text-align:center;font-size:22px;color:#2575e7;margin:16px 0;font-weight:bold}
+.sync-bar{display:flex;gap:8px;margin-bottom:14px}
+.sync-bar button{flex:1;padding:10px;border:none;border-radius:8px;background:#0ea5e9;color:#fff}
+.tab-box{display:flex;background:#e6f0ff;border-radius:10px;margin-bottom:14px}
+.tab-box button{flex:1;border:none;padding:12px 0;font-size:16px;background:transparent;color:#2575e7;border-radius:10px}
+.tab-box button.active{background:#2575e7;color:#fff}
+.card{background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 1px 6px #00000010}
+.card h3{font-size:17px;margin-bottom:12px;color:#222}
+input,select,textarea{width:100%;padding:11px 12px;border:1px #dde4ee solid;border-radius:9px;font-size:15px;margin:6px 0}
+textarea{min-height:70px;resize:none}
+.btn{background:#2575e7;color:#fff;border:none;padding:12px 0;border-radius:9px;width:100%;font-size:16px;margin-top:8px}
+.btn-del{background:#f24c4c}
+.record-item{border:1px #e8edf5 solid;border-radius:9px;padding:12px;margin:8px 0}
+.record-item p{margin:4px 0;font-size:14px;color:#444}
+.empty-tip{color:#999;text-align:center;padding:20px 0}
+.chart-box{margin-top:10px;height:240px}
+.page{display:none}
+.page.show{display:block}
+.tip-text{text-align:center;margin:6px 0;color:#008833}
+</style>
+</head>
+<body>
+<div class="title">萌娃寒假运动打卡</div>
+<div class="tip-text" id="syncTip">本地模式，点击同步按钮读写云端</div>
+<div class="sync-bar">
+    <button onclick="loadCloud()">拉取云端数据</button>
+    <button onclick="saveCloud()">保存全部到云端</button>
+</div>
+<div class="tab-box">
+    <button class="active" onclick="switchTab(0)">每日打卡录入</button>
+    <button onclick="switchTab(1)">运动统计报表</button>
+</div>
+
+<!-- 录入页面 -->
+<div id="pageInput" class="page show">
+    <div class="card">
+        <h3>选择打卡日期</h3>
+        <input type="date" id="selDate">
+    </div>
+    <div class="card">
+        <h3>添加当日运动项目</h3>
+        <select id="sportType">
+            <option value="跳绳">跳绳</option>
+            <option value="户外跑步">户外跑步</option>
+            <option value="拍皮球">拍皮球</option>
+            <option value="轮滑">轮滑</option>
+            <option value="立定跳远">立定跳远</option>
+            <option value="骑自行车">骑自行车</option>
+            <option value="体操拉伸">体操拉伸</option>
+            <option value="游泳">游泳</option>
+        </select>
+        <input type="number" id="sportMin" placeholder="运动时长（分钟）">
+        <input type="text" id="sportCount" placeholder="次数/距离（选填）">
+        <textarea id="sportNote" placeholder="备注：孩子运动状态、天气、进步情况"></textarea>
+        <button class="btn" onclick="addSport()">保存本条记录（本地）</button>
+    </div>
+    <div class="card">
+        <h3>当日运动清单</h3>
+        <div id="todayList"></div>
+        <div class="empty-tip" id="emptyTip">暂无运动记录</div>
+    </div>
+</div>
+
+<!-- 报表页面 -->
+<div id="pageReport" class="page">
+    <div class="card">
+        <h3>寒假运动总概况</h3>
+        <div id="totalText"></div>
+    </div>
+    <div class="card">
+        <h3>各类运动时长占比</h3>
+        <div class="chart-box"><canvas id="pieChart"></canvas></div>
+    </div>
+    <div class="card">
+        <h3>每日运动时长柱状图</h3>
+        <div class="chart-box"><canvas id="barChart"></canvas></div>
+    </div>
+    <button class="btn" onclick="exportAllData()">导出全部记录TXT</button>
+</div>
+
+<script>
+let sportData = JSON.parse(localStorage.getItem('kidSportData')) || [];
+let pieChartIns, barChartIns;
+const todayStr = new Date().toISOString().split('T')[0];
+document.getElementById('selDate').value = todayStr;
+const syncTip = document.getElementById('syncTip');
+
+// 切换标签页
+function switchTab(idx){
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('show'));
+    document.querySelectorAll('.tab-box button').forEach((b,i)=>{
+        i===idx ? b.classList.add('active') : b.classList.remove('active');
+    })
+    if(idx===0){
+        document.getElementById('pageInput').classList.add('show');
+        renderTodayRecords();
+    }else{
+        document.getElementById('pageReport').classList.add('show');
+        renderReport();
+    }
+}
+
+// 本地保存
+function saveLocal(){
+    localStorage.setItem('kidSportData', JSON.stringify(sportData));
+}
+
+// 新增运动记录（仅本地）
+function addSport(){
+    const date = document.getElementById('selDate').value.trim();
+    const type = document.getElementById('sportType').value;
+    const min = Number(document.getElementById('sportMin').value.trim());
+    const count = document.getElementById('sportCount').value.trim();
+    const note = document.getElementById('sportNote').value.trim();
+    if(!date || !min || min<=0){
+        alert('请填写日期和有效运动时长！');
+        return;
+    }
+    const item = {
+        id: Date.now(),
+        date: date,
+        type: type,
+        time: min,
+        count: count,
+        note: note
+    };
+    sportData.push(item);
+    saveLocal();
+    document.getElementById('sportMin').value = '';
+    document.getElementById('sportCount').value = '';
+    document.getElementById('sportNote').value = '';
+    renderTodayRecords();
+    syncTip.innerText = "已保存本地，记得点【保存到云端】同步";
+}
+
+// 删除单条记录（本地）
+function delRecord(id){
+    sportData = sportData.filter(item=>item.id !== id);
+    saveLocal();
+    renderTodayRecords();
+    syncTip.innerText = "已删除本地记录，记得同步云端";
+}
+
+// 渲染当日列表
+function renderTodayRecords(){
+    const selDate = document.getElementById('selDate').value;
+    const listWrap = document.getElementById('todayList');
+    const tip = document.getElementById('emptyTip');
+    const dayData = sportData.filter(d=>d.date === selDate);
+    if(dayData.length === 0){
+        listWrap.innerHTML = '';
+        tip.style.display = 'block';
+        return;
+    }
+    tip.style.display = 'none';
+    let html = '';
+    dayData.forEach(item=>{
+        html += `
+        <div class="record-item">
+            <p>项目：${item.type} | 时长：${item.time}分钟</p>
+            <p>数量：${item.count||'无'} | 备注：${item.note||'无'}</p>
+            <button class="btn btn-del" style="width:auto;padding:6px 12px;margin-top:6px" onclick="delRecord(${item.id})">删除本条</button>
+        </div>`;
+    });
+    listWrap.innerHTML = html;
+}
+
+// ========== Netlify Blobs 云端接口 ==========
+// 拉取云端数据覆盖本地
+async function loadCloud(){
+    syncTip.innerText = "正在拉取云端数据...";
+    try {
+        const res = await fetch("/api/sport");
+        const json = await res.json();
+        sportData = json.data || [];
+        saveLocal();
+        renderTodayRecords();
+        syncTip.innerText = "云端数据同步完成！";
+    } catch(err){
+        syncTip.innerText = "拉取失败：仅本地可用，部署后才能访问云端";
+        console.error(err);
+    }
+}
+
+// 本地全部数据上传覆盖云端
+async function saveCloud(){
+    syncTip.innerText = "正在上传全部数据到云端...";
+    try {
+        const res = await fetch("/api/sport", {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({ list: sportData })
+        });
+        const json = await res.json();
+        if(json.success){
+            syncTip.innerText = "全部数据已保存云端，其他设备可拉取";
+        }
+    } catch(err){
+        syncTip.innerText = "上传失败：仅本地可用，部署后才能访问云端";
+        console.error(err);
+    }
+}
+
+// 报表渲染
+function renderReport(){
+    const allDateSet = new Set(sportData.map(i=>i.date));
+    const totalDay = allDateSet.size;
+    const totalMin = sportData.reduce((sum,item)=>sum + item.time, 0);
+    const totalHour = Math.floor(totalMin / 60);
+    const typeMap = {};
+    const dayMap = {};
+    sportData.forEach(item=>{
+        typeMap[item.type] = (typeMap[item.type] || 0) + item.time;
+        dayMap[item.date] = (dayMap[item.date] || 0) + item.time;
+    });
+    let textHtml = `
+        <p>累计打卡天数：${totalDay} 天</p>
+        <p>总运动时长：${totalMin} 分钟 ≈ ${totalHour} 小时</p>
+    `;
+    Object.keys(typeMap).forEach(k=>{
+        textHtml += `<p>· ${k}：${typeMap[k]} 分钟</p>`;
+    });
+    document.getElementById('totalText').innerHTML = textHtml;
+    if(pieChartIns) pieChartIns.destroy();
+    if(barChartIns) barChartIns.destroy();
+    const pieCtx = document.getElementById('pieChart').getContext('2d');
+    pieChartIns = new Chart(pieCtx, {
+        type: 'pie',
+        data: {labels: Object.keys(typeMap), datasets: [{data: Object.values(typeMap)}]},
+        options: {responsive:true, maintainAspectRatio:false}
+    });
+    const dayKeys = Object.keys(dayMap).sort();
+    const barCtx = document.getElementById('barChart').getContext('2d');
+    barChartIns = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: dayKeys,
+            datasets: [{label: '当日运动分钟', data: dayKeys.map(d=>dayMap[d]), backgroundColor: '#2575e7'}]
+        },
+        options: {responsive:true, maintainAspectRatio:false}
+    });
+}
+
+// 导出TXT
+function exportAllData(){
+    let content = "【萌娃寒假运动记录】\n";
+    sportData.forEach(item=>{
+        content += `日期：${item.date}，项目：${item.type}，时长：${item.time}分钟，补充：${item.count}，备注：${item.note}\n`;
+    });
+    const blob = new Blob([content], {type:'text/plain;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = "寒假运动记录.txt";
+    a.click();
+}
+
+document.getElementById('selDate').addEventListener('change', renderTodayRecords);
+renderTodayRecords();
+</script>
+</body>
+</html>

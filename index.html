@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>萌娃运动打卡</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -25,30 +27,45 @@
         }
         .tip-text {
             text-align: center;
-            color: #16a34a;
             font-size: 15px;
             margin-bottom: 20px;
             min-height: 22px;
         }
-        .tab-wrap {
+        .tip-success {color: #16a34a;}
+        .tip-error {color: #ef4444;}
+        .user-bar {
             display: flex;
-            gap: 4px;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 10px 16px;
+            background: white;
+            border-radius: 10px;
+        }
+        .logout-btn {
+            padding: 6px 12px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .top-btn-row {
+            display: flex;
+            gap: 6px;
             margin-bottom: 24px;
         }
-        .tab-btn {
+        .top-btn-row button {
             flex: 1;
             padding: 14px 0;
             border: none;
-            border-radius: 10px 10px 0 0;
+            border-radius: 10px;
             font-size: 17px;
             cursor: pointer;
-            background: #e2e8f0;
-            color: #475569;
-        }
-        .tab-btn.active {
-            background: #2563eb;
             color: white;
+            background: #60a5fa;
         }
+        .top-btn-row button.active {background: #2563eb;}
         .card {
             background: white;
             border-radius: 14px;
@@ -62,18 +79,14 @@
             margin-bottom: 16px;
             color: #1e293b;
         }
-        .form-item {
-            margin-bottom: 16px;
-        }
+        .form-item {margin-bottom: 16px;}
         .form-item label {
             display: block;
             font-size: 15px;
             color: #334155;
             margin-bottom: 8px;
         }
-        .form-item input,
-        .form-item select,
-        .form-item textarea {
+        .form-item input, .form-item select, .form-item textarea {
             width: 100%;
             padding: 13px 14px;
             border: 1px solid #cbd5e1;
@@ -91,6 +104,19 @@
             font-weight: 500;
             cursor: pointer;
         }
+        .action-btn {
+            flex: 1;
+            padding: 14px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 17px;
+            font-weight: 500;
+            cursor: pointer;
+            color: white;
+        }
+        .blue-btn {background: #2563eb;}
+        .red-btn {background: #ef4444;}
+        .green-btn {background: #16a34a;}
         .list-item {
             padding: 16px;
             border: 1px solid #e2e8f0;
@@ -100,6 +126,15 @@
             justify-content: space-between;
             align-items: center;
         }
+        .list-item-with-check {
+            padding: 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
         .del-btn {
             padding: 8px 16px;
             background: #ef4444;
@@ -108,177 +143,794 @@
             border-radius: 8px;
             cursor: pointer;
         }
-        .tab-panel {
-            display: none;
+        .check-item {width: 18px;height: 18px;cursor: pointer;}
+        .tab-panel {display: none;}
+        .tab-panel.active {display: block;}
+        .login-card {max-width: 420px;margin: 60px auto 0;}
+        .chart-box {width: 100%;height: 320px;margin-bottom: 12px;}
+        .chart-switch-btn {
+            padding: 6px 12px;
+            margin-bottom: 12px;
+            border: 1px solid #2563eb;
+            background: white;
+            color: #2563eb;
+            border-radius: 6px;
+            cursor: pointer;
         }
-        .tab-panel.active {
-            display: block;
+        .chart-switch-btn.active {background: #2563eb;color: white;}
+        .best-score-item {
+            padding: 12px;
+            border: 1px solid #dbeafe;
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+        .best-score-name {font-weight: 600;color: #2563eb;margin-bottom: 4px;}
+        .person-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding:12px;
+            border:1px solid #dbeafe;
+            border-radius:10px;
+            margin-bottom:10px;
+        }
+        .person-active {background:#dbeafe;}
+        .share-row {display:flex;gap:8px;margin-top:10px;}
+        .share-input {flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:8px;}
+        .switch-tab-text {
+            text-align:center;
+            margin-top:16px;
+            color:#2563eb;
+            cursor:pointer;
         }
     </style>
 </head>
 <body>
-    <h1>萌娃运动打卡</h1>
+    <h1 id="pageTitle">萌娃运动打卡 - 请选择孩子</h1>
     <div class="tip-text" id="tip">加载中...</div>
-    <div style="display: flex; gap:12px; margin-bottom:20px;">
-        <button class="cloud-btn" onclick="fetchCloudData()" style="flex:1; padding:14px; background:#38bdf8; border:none; border-radius:10px; color:white; font-size:16px;">拉取云端数据</button>
-        <button class="cloud-btn" onclick="saveAllToCloud()" style="flex:1; padding:14px; background:#0ea5e9; border:none; border-radius:10px; color:white; font-size:16px;">保存全部到云端</button>
-    </div>
 
-    <div class="tab-wrap">
-        <button class="tab-btn active" data-tab="input">每日打卡录入</button>
-        <button class="tab-btn" data-tab="chart">运动统计报表</button>
-    </div>
-
-    <!-- 录入面板 -->
-    <div class="tab-panel active" id="input">
-        <div class="card">
-            <div class="card-title">添加当日运动项目</div>
-            <div class="form-item">
-                <label>运动类型</label>
-                <select id="sportType">
-                    <option value="跑步">跑步</option>
-                    <option value="骑自行车">骑自行车</option>
-                    <option value="爬山">爬山</option>
-                    <option value="羽毛球">羽毛球</option>
-                    <option value="徒步">徒步</option>
-                    <option value="游泳">游泳</option>
-                    <option value="跳绳">跳绳</option>
-                    <option value="健身">健身</option>
-                </select>
+    <!-- 登录/注册切换面板 -->
+    <div id="authPanel">
+        <div class="card login-card">
+            <div class="card-title" style="text-align:center" id="authTitle">账号登录</div>
+            <!-- 登录表单 -->
+            <div id="loginForm">
+                <div class="form-item">
+                    <label>手机号</label>
+                    <input type="number" id="loginPhone" placeholder="请输入11位手机号">
+                </div>
+                <div class="form-item">
+                    <label>密码</label>
+                    <input type="password" id="loginPwd" placeholder="请输入密码">
+                </div>
+                <button class="submit-cloud-btn" onclick="userLogin()" style="width:100%;margin-top:10px;">登录</button>
+                <div class="switch-tab-text" onclick="switchAuthTab()">没有账号？去注册</div>
             </div>
-            <div class="form-item">
-                <label>运动时长 (分钟)</label>
-                <input type="number" id="sportTime" placeholder="请输入时长">
+            <!-- 注册表单 -->
+            <div id="registerForm" style="display:none;">
+                <div class="form-item">
+                    <label>手机号</label>
+                    <input type="number" id="regPhone" placeholder="请输入11位手机号">
+                </div>
+                <div class="form-item">
+                    <label>设置密码</label>
+                    <input type="password" id="regPwd" placeholder="设置登录密码">
+                </div>
+                <div class="form-item">
+                    <label>确认密码</label>
+                    <input type="password" id="regPwd2" placeholder="再次输入密码">
+                </div>
+                <button class="submit-cloud-btn" onclick="userRegister()" style="width:100%;margin-top:10px;">注册账号</button>
+                <div class="switch-tab-text" onclick="switchAuthTab()">已有账号？去登录</div>
             </div>
-            <div class="form-item">
-                <label>次数/距离 (选填)</label>
-                <input type="text" id="sportDist" placeholder="例如：5公里 / 3组">
-            </div>
-            <div class="form-item">
-                <label>备注: 孩子运动状态、天气、进步情况</label>
-                <textarea id="sportNote" rows="4"></textarea>
-            </div>
-            <button class="submit-cloud-btn" onclick="addSportRecord()">添加本条记录（直接存入云端）</button>
-        </div>
-        <div class="card">
-            <div class="card-title">当日运动清单</div>
-            <div id="recordList"></div>
         </div>
     </div>
 
-    <!-- 统计面板 -->
-    <div class="tab-panel" id="chart">
+    <!-- 主程序面板（登录后） -->
+    <div id="mainPanel" style="display:none;">
+        <div class="user-bar">
+            <span>当前账号：<b id="currentUserName"></b></span>
+            <button class="logout-btn" onclick="logout()">退出登录</button>
+        </div>
+
+        <!-- 孩子人员管理面板 -->
         <div class="card">
-            <div class="card-title">云端运动统计</div>
-            <p>切换设备后，点击「拉取云端数据」即可查看全部打卡记录</p>
+            <div class="card-title">孩子人员管理</div>
+            <div style="display:flex;gap:12px;margin-bottom:16px;">
+                <button class="action-btn green-btn" onclick="openCreatePerson()">新建孩子</button>
+                <button class="action-btn blue-btn" onclick="bindPersonById()">通过ID绑定孩子</button>
+            </div>
+            <div id="personListWrap"></div>
+            <!-- 新建弹窗 -->
+            <div id="createPersonForm" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #eee;">
+                <div class="form-item">
+                    <label>孩子姓名</label>
+                    <input type="text" id="newPersonName" placeholder="输入孩子姓名">
+                </div>
+                <button class="submit-cloud-btn" onclick="createNewPerson()">创建人员</button>
+            </div>
+            <!-- 绑定弹窗 -->
+            <div id="bindPersonForm" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #eee;">
+                <div class="form-item">
+                    <label>输入分享的人员ID</label>
+                    <input type="text" id="bindPersonIdInput" placeholder="粘贴对方分享的人员ID">
+                </div>
+                <button class="submit-cloud-btn" onclick="bindPerson()">绑定该孩子</button>
+            </div>
+        </div>
+
+        <!-- 顶部功能切换 -->
+        <div class="top-btn-row">
+            <button class="active" data-tab="input">每日打卡录入</button>
+            <button data-tab="detail">运动明细记录</button>
+            <button data-tab="chart">运动统计报表</button>
+        </div>
+
+        <!-- 打卡录入 -->
+        <div class="tab-panel active" id="input">
+            <div class="card">
+                <div class="card-title">添加当日运动项目</div>
+                <div class="form-item">
+                    <label>打卡日期</label>
+                    <input type="date" id="checkDate">
+                </div>
+                <div class="form-item">
+                    <label>运动类型</label>
+                    <select id="sportType">
+                        <option value="跑步">跑步</option>
+                        <option value="骑自行车">骑自行车</option>
+                        <option value="爬山">爬山</option>
+                        <option value="羽毛球">羽毛球</option>
+                        <option value="徒步">徒步</option>
+                        <option value="游泳">游泳</option>
+                        <option value="跳绳">跳绳</option>
+                        <option value="跳操">跳操</option>
+                    </select>
+                </div>
+                <div class="form-item">
+                    <label>运动时长 (分钟)</label>
+                    <input type="number" id="sportTime" placeholder="请输入时长">
+                </div>
+                <div class="form-item">
+                    <label>数量合计 (选填)</label>
+                    <input type="text" id="sportDist" placeholder="例如：5公里 / 3组">
+                </div>
+                <div class="form-item">
+                    <label>最优成绩 (选填)</label>
+                    <input type="text" id="bestScore" placeholder="本次最佳成绩记录">
+                </div>
+                <div class="form-item">
+                    <label>备注: 孩子运动状态、天气、进步情况</label>
+                    <textarea id="sportNote" rows="4"></textarea>
+                </div>
+                <button class="submit-cloud-btn" onclick="addSportRecord()">保存</button>
+            </div>
+            <div class="card">
+                <div class="card-title">运动清单</div>
+                <div id="recordList"></div>
+            </div>
+        </div>
+
+        <!-- 明细记录 -->
+        <div class="tab-panel" id="detail">
+            <div class="card">
+                <div class="card-title">运动明细记录</div>
+                <div style="display:flex; gap:12px; margin-bottom:16px;">
+                    <button class="action-btn blue-btn" onclick="exportExcel()">导出到Excel</button>
+                    <button class="action-btn red-btn" onclick="batchDelete()">删除选中项</button>
+                </div>
+                <div id="detailRecordList"></div>
+            </div>
+        </div>
+
+        <!-- 统计报表 -->
+        <div class="tab-panel" id="chart">
+            <div class="card">
+                <div class="card-title">1. 每日各类运动时长堆叠统计图</div>
+                <canvas class="chart-box" id="dayTimeChart"></canvas>
+            </div>
+            <div class="card">
+                <div class="card-title">2. 单项运动趋势统计</div>
+                <div>
+                    <button class="chart-switch-btn active" onclick="switchSportChart('bar')">柱状图</button>
+                    <button class="chart-switch-btn" onclick="switchSportChart('line')">曲线图</button>
+                </div>
+                <canvas class="chart-box" id="sportTrendChart"></canvas>
+            </div>
+            <div class="card">
+                <div class="card-title">3. 各类运动最优成绩</div>
+                <div id="bestScoreWrap"></div>
+            </div>
         </div>
     </div>
 
 <script>
     const tipDom = document.getElementById('tip');
     let sportList = [];
+    let sportChartType = "bar";
+    let dayChartInstance = null;
+    let trendChartInstance = null;
+    let currentUser = ""; // 当前登录手机号
+    let currentPersonId = ""; // 当前操作孩子PID
+    const isLocalEnv = window.location.protocol === "file:";
 
-    // 切换标签
-    document.querySelectorAll('.tab-btn').forEach(btn=>{
-        btn.onclick = ()=>{
-            const tab = btn.dataset.tab;
-            document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-            document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById(tab).classList.add('active');
-        }
-    })
+    // 存储key常量
+    const STORAGE_KEYS = {
+        loginUser: "sportLoginPhone",
+        allUser: "sport_all_user",
+        allPersons: "sport_all_persons",
+        userBindPersons: (u)=>`sport_bind_${u}`,
+        personRecords: (pid)=>`sport_rec_${pid}`
+    }
 
-    // 从云端拉取数据
-    async function fetchCloudData(){
-        tipDom.textContent = "正在拉取云端数据...";
-        try{
-            const res = await fetch("/api/sport");
-            if(!res.ok) throw new Error("接口异常");
-            const json = await res.json();
-            sportList = json.data || [];
-            renderList();
-            tipDom.textContent = "拉取云端数据成功";
-        }catch(e){
-            tipDom.textContent = "云端访问失败，请检查部署";
+    // 日期工具
+    function getTodayDate() {
+        const d = new Date();
+        const y = d.getFullYear();
+        let m = d.getMonth()+1, day = d.getDate();
+        m = m<10?"0"+m:m; day = day<10?"0"+day:day;
+        return `${y}-${m}-${day}`;
+    }
+    function genPersonId(){
+        return "PID_"+Date.now()+"_"+Math.floor(Math.random()*1000);
+    }
+    // 校验手机号11位数字
+    function checkPhone(phone){
+        return /^1[3-9]\d{10}$/.test(phone);
+    }
+
+    // 提示
+    function setTip(text, isErr=false){
+        tipDom.textContent = text;
+        tipDom.className = isErr ? "tip-text tip-error" : "tip-text tip-success";
+    }
+
+    // 切换登录/注册表单
+    function switchAuthTab(){
+        const loginForm = document.getElementById("loginForm");
+        const regForm = document.getElementById("registerForm");
+        const title = document.getElementById("authTitle");
+        if(loginForm.style.display === "none"){
+            loginForm.style.display = "block";
+            regForm.style.display = "none";
+            title.innerText = "账号登录";
+        }else{
+            loginForm.style.display = "none";
+            regForm.style.display = "block";
+            title.innerText = "新用户注册";
         }
     }
 
-    // 保存全部列表到云端
-    async function saveAllToCloud(){
-        tipDom.textContent = "正在上传全部数据到云端...";
-        try{
-            const res = await fetch("/api/sport",{
-                method:"POST",
-                headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({list:sportList})
-            });
-            const json = await res.json();
-            if(json.success){
-                tipDom.textContent = "已全部保存至云端，其他设备可同步";
-            }else{
-                tipDom.textContent = "云端保存失败";
-            }
-        }catch(e){
-            tipDom.textContent = "云端访问失败，请检查部署";
-        }
-    }
-
-    // 新增一条运动记录（直接进数组，必须点保存全部到云端才会持久化）
-    function addSportRecord(){
-        const type = document.getElementById('sportType').value;
-        const time = document.getElementById('sportTime').value.trim();
-        const dist = document.getElementById('sportDist').value.trim();
-        const note = document.getElementById('sportNote').value.trim();
-        if(!time){
-            tipDom.textContent = "请填写运动时长";
+    // 更新页面标题（显示当前孩子姓名）
+    function updatePageTitle() {
+        const titleEl = document.getElementById("pageTitle");
+        if (!currentPersonId) {
+            titleEl.innerText = "萌娃运动打卡 - 请选择孩子";
             return;
         }
-        sportList.push({
-            type, time, dist, note,
-            date: new Date().toLocaleDateString()
-        });
-        // 清空输入框
-        document.getElementById('sportTime').value = "";
-        document.getElementById('sportDist').value = "";
-        document.getElementById('sportNote').value = "";
-        renderList();
-        tipDom.textContent = "已新增记录，点击「保存全部到云端」永久存储";
+        let allPersons = [];
+        if (isLocalEnv) {
+            allPersons = JSON.parse(localStorage.getItem(STORAGE_KEYS.allPersons) || "[]");
+            const target = allPersons.find(p => p.personId === currentPersonId);
+            titleEl.innerText = target ? `萌娃运动打卡 - ${target.name}` : "萌娃运动打卡 - 请选择孩子";
+        } else {
+            fetch(`/api/sport?mode=person&user=${currentUser}`)
+                .then(res => res.json())
+                .then(json => {
+                    const all = json.allPersons || [];
+                    const target = all.find(p => p.personId === currentPersonId);
+                    titleEl.innerText = target ? `萌娃运动打卡 - ${target.name}` : "萌娃运动打卡 - 请选择孩子";
+                })
+        }
     }
 
-    // 删除单条记录
-    function delRecord(index){
-        sportList.splice(index,1);
-        renderList();
-        tipDom.textContent = "已删除本条，记得保存到云端";
+    // 手机号注册
+    async function userRegister(){
+        const phone = document.getElementById("regPhone").value.trim();
+        const pwd1 = document.getElementById("regPwd").value.trim();
+        const pwd2 = document.getElementById("regPwd2").value.trim();
+        if(!checkPhone(phone)){setTip("请输入合法11位手机号",true);return;}
+        if(pwd1.length < 6){setTip("密码至少6位",true);return;}
+        if(pwd1 !== pwd2){setTip("两次输入密码不一致",true);return;}
+        let userMap = {};
+        if(isLocalEnv){
+            const local = localStorage.getItem(STORAGE_KEYS.allUser);
+            userMap = local ? JSON.parse(local) : {};
+        }else{
+            const res = await fetch(`/api/sport?mode=getUser`);
+            const json = await res.json();
+            userMap = json.userMap || {};
+        }
+        if(userMap[phone]){setTip("该手机号已注册，请直接登录",true);return;}
+        userMap[phone] = pwd1;
+        if(isLocalEnv){
+            localStorage.setItem(STORAGE_KEYS.allUser, JSON.stringify(userMap));
+        }else{
+            await fetch("/api/sport",{
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({mode:"saveUser", userMap})
+            })
+        }
+        setTip("注册成功，请登录");
+        switchAuthTab();
+        document.getElementById("regPhone").value = "";
+        document.getElementById("regPwd").value = "";
+        document.getElementById("regPwd2").value = "";
     }
 
-    // 渲染列表
-    function renderList(){
-        const wrap = document.getElementById('recordList');
-        if(sportList.length === 0){
-            wrap.innerHTML = "<p style='color:#64748b;'>暂无运动记录</p>";
+    // 手机号登录
+    async function userLogin(){
+        const phone = document.getElementById("loginPhone").value.trim();
+        const pwd = document.getElementById("loginPwd").value.trim();
+        if(!checkPhone(phone)){setTip("请输入合法11位手机号",true);return;}
+        if(!pwd){setTip("请输入密码",true);return;}
+        let userMap = {};
+        if(isLocalEnv){
+            const local = localStorage.getItem(STORAGE_KEYS.allUser);
+            userMap = local ? JSON.parse(local) : {};
+        }else{
+            const res = await fetch(`/api/sport?mode=getUser`);
+            const json = await res.json();
+            userMap = json.userMap || {};
+        }
+        if(!userMap[phone] || userMap[phone] !== pwd){
+            setTip("手机号或密码错误，未注册请先注册",true);
+            return;
+        }
+        currentUser = phone;
+        localStorage.setItem(STORAGE_KEYS.loginUser, phone);
+        document.getElementById("currentUserName").innerText = phone;
+        document.getElementById("authPanel").style.display = "none";
+        document.getElementById("mainPanel").style.display = "block";
+        document.getElementById("checkDate").value = getTodayDate();
+        await loadAllPersonData();
+        updatePageTitle();
+        setTip(`登录成功，当前账号：${phone}`);
+    }
+
+    // 退出登录
+    function logout(){
+        currentUser = ""; currentPersonId = ""; sportList=[];
+        localStorage.removeItem(STORAGE_KEYS.loginUser);
+        document.getElementById("authPanel").style.display = "block";
+        document.getElementById("mainPanel").style.display = "none";
+        updatePageTitle();
+        setTip("已退出登录");
+    }
+
+    // 加载全局人员+当前账号绑定列表
+    async function loadAllPersonData(){
+        let allPersons = [];
+        let bindPids = [];
+        if(isLocalEnv){
+            allPersons = JSON.parse(localStorage.getItem(STORAGE_KEYS.allPersons) || "[]");
+            bindPids = JSON.parse(localStorage.getItem(STORAGE_KEYS.userBindPersons(currentUser)) || "[]");
+        }else{
+            const res = await fetch(`/api/sport?mode=person&user=${currentUser}`);
+            const json = await res.json();
+            allPersons = json.allPersons || [];
+            bindPids = json.bindPids || [];
+        }
+        renderPersonList(allPersons, bindPids);
+    }
+
+    // 渲染人员列表
+    function renderPersonList(allPersons, bindPids){
+        const wrap = document.getElementById("personListWrap");
+        const bindPersonArr = allPersons.filter(p=>bindPids.includes(p.personId));
+        if(bindPersonArr.length===0){
+            wrap.innerHTML = "<p style='color:#64748b;'>暂无绑定孩子，请新建或输入ID绑定</p>";
             return;
         }
         let html = "";
-        sportList.forEach((item,idx)=>{
+        bindPersonArr.forEach(p=>{
+            const isCreator = p.createUser === currentUser;
+            const isActive = currentPersonId === p.personId;
             html += `
-                <div class="list-item">
+                <div class="person-item ${isActive?'person-active':''}">
                     <div>
-                        <div>项目：${item.type} | 时长：${item.time}分钟</div>
-                        <div>数量：${item.dist||"无"} | 备注：${item.note||"无"}</div>
-                        <div style="font-size:13px; color:#666;">日期：${item.date}</div>
+                        <div><b>${p.name}</b> ${isCreator?"(创建人，可分享ID)":"(共享绑定)"}</div>
+                        <div style="font-size:13px;color:#666;">人员ID：${p.personId}</div>
+                        <div class="share-row">
+                            <input class="share-input" value="${p.personId}" readonly>
+                            <button onclick="copyShareId('${p.personId}')">复制ID</button>
+                        </div>
                     </div>
-                    <button class="del-btn" onclick="delRecord(${idx})">删除本条</button>
+                    <div style="display:flex;gap:6px;">
+                        <button onclick="switchCurrentPerson('${p.personId}')" class="submit-cloud-btn">查看录入</button>
+                        ${isCreator?`<button class="del-btn" onclick="deletePerson('${p.personId}')">删除孩子</button>`:""}
+                    </div>
                 </div>
             `;
         })
         wrap.innerHTML = html;
     }
+    // 复制分享ID
+    async function copyShareId(pid){
+        await navigator.clipboard.writeText(pid);
+        setTip("人员ID已复制，可发给配偶绑定");
+    }
+    // 切换当前操作孩子
+    async function switchCurrentPerson(pid){
+        currentPersonId = pid;
+        await loadPersonRecord();
+        renderList(); renderDetailList(); renderAllChart();
+        updatePageTitle();
+        setTip("已切换至当前孩子数据");
+    }
 
-    // 页面加载自动拉取云端
-    window.onload = ()=>{
-        fetchCloudData();
+    // 新建人员面板
+    function openCreatePerson(){
+        document.getElementById("createPersonForm").style.display = "block";
+        document.getElementById("bindPersonForm").style.display = "none";
+    }
+    function bindPersonById(){
+        document.getElementById("bindPersonForm").style.display = "block";
+        document.getElementById("createPersonForm").style.display = "none";
+    }
+
+    // 创建新人员（当前账号为创建者）
+    async function createNewPerson(){
+        const name = document.getElementById("newPersonName").value.trim();
+        if(!name){setTip("请输入孩子姓名",true);return;}
+        const pid = genPersonId();
+        const newPerson = {
+            personId: pid,
+            name: name,
+            createUser: currentUser,
+            createTime: new Date().toLocaleString()
+        };
+        let allPersons = isLocalEnv
+            ? JSON.parse(localStorage.getItem(STORAGE_KEYS.allPersons) || "[]")
+            : (await (await fetch(`/api/sport?mode=person&user=${currentUser}`)).json()).allPersons || [];
+        allPersons.push(newPerson);
+        let bindPids = isLocalEnv
+            ? JSON.parse(localStorage.getItem(STORAGE_KEYS.userBindPersons(currentUser)) || "[]")
+            : (await (await fetch(`/api/sport?mode=person&user=${currentUser}`)).json()).bindPids || [];
+        bindPids.push(pid);
+        if(isLocalEnv){
+            localStorage.setItem(STORAGE_KEYS.allPersons, JSON.stringify(allPersons));
+            localStorage.setItem(STORAGE_KEYS.userBindPersons(currentUser), JSON.stringify(bindPids));
+        }else{
+            await fetch("/api/sport", {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({mode:"person", allPersons, bindPids, user:currentUser})
+            })
+        }
+        document.getElementById("newPersonName").value = "";
+        document.getElementById("createPersonForm").style.display = "none";
+        await loadAllPersonData();
+        updatePageTitle();
+        setTip(`创建成功，人员ID：${pid}，可复制分享给家人`);
+    }
+
+    // 通过ID绑定他人创建的人员
+    async function bindPerson(){
+        const pid = document.getElementById("bindPersonIdInput").value.trim();
+        if(!pid){setTip("请输入人员ID",true);return;}
+        let allPersons = isLocalEnv
+            ? JSON.parse(localStorage.getItem(STORAGE_KEYS.allPersons) || "[]")
+            : (await (await fetch(`/api/sport?mode=person&user=${currentUser}`)).json()).allPersons || [];
+        const target = allPersons.find(p=>p.personId === pid);
+        if(!target){setTip("该人员ID不存在，请核对",true);return;}
+        let bindPids = isLocalEnv
+            ? JSON.parse(localStorage.getItem(STORAGE_KEYS.userBindPersons(currentUser)) || "[]")
+            : (await (await fetch(`/api/sport?mode=person&user=${currentUser}`)).json()).bindPids || [];
+        if(bindPids.includes(pid)){setTip("你已绑定该孩子，无需重复操作",true);return;}
+        bindPids.push(pid);
+        if(isLocalEnv){
+            localStorage.setItem(STORAGE_KEYS.userBindPersons(currentUser), JSON.stringify(bindPids));
+        }else{
+            await fetch("/api/sport", {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({mode:"person", allPersons, bindPids, user:currentUser})
+            })
+        }
+        document.getElementById("bindPersonIdInput").value = "";
+        document.getElementById("bindPersonForm").style.display = "none";
+        await loadAllPersonData();
+        updatePageTitle();
+        setTip(`绑定成功，现在可查看${target.name}的运动记录`);
+    }
+
+    // 删除人员（仅创建者可操作）
+    async function deletePerson(pid){
+        if(!confirm("删除后该孩子所有运动记录将全部清除，确定？")) return;
+        let allPersons = isLocalEnv
+            ? JSON.parse(localStorage.getItem(STORAGE_KEYS.allPersons) || "[]")
+            : (await (await fetch(`/api/sport?mode=person&user=${currentUser}`)).json()).allPersons || [];
+        allPersons = allPersons.filter(p=>p.personId !== pid);
+        if(isLocalEnv){
+            localStorage.setItem(STORAGE_KEYS.allPersons, JSON.stringify(allPersons));
+            localStorage.removeItem(STORAGE_KEYS.personRecords(pid));
+        }else{
+            await fetch("/api/sport", {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({mode:"delPerson", delPid:pid, allPersons, user:currentUser})
+            })
+        }
+        if(currentPersonId === pid){
+            currentPersonId = "";
+            sportList = []; renderList(); renderDetailList(); renderAllChart();
+        }
+        await loadAllPersonData();
+        updatePageTitle();
+        setTip("人员及对应运动记录已删除");
+    }
+
+    // 加载当前选中孩子的运动记录
+    async function loadPersonRecord(){
+        if(!currentPersonId){sportList=[];return;}
+        if(isLocalEnv){
+            const local = localStorage.getItem(STORAGE_KEYS.personRecords(currentPersonId));
+            sportList = local ? JSON.parse(local) : [];
+            return;
+        }
+        try{
+            const res = await fetch(`/api/sport?pid=${currentPersonId}`);
+            const json = await res.json();
+            sportList = json.data || [];
+        }catch(e){
+            sportList = [];
+            setTip(`加载失败：${e.message}`,true);
+        }
+    }
+
+    // 保存当前孩子记录
+    async function savePersonRecord(){
+        if(!currentPersonId) return false;
+        if(isLocalEnv){
+            localStorage.setItem(STORAGE_KEYS.personRecords(currentPersonId), JSON.stringify(sportList));
+            setTip("已保存至本地");
+            return true;
+        }
+        try{
+            const res = await fetch("/api/sport",{
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({list:sportList, pid:currentPersonId})
+            })
+            const json = await res.json();
+            if(json.success){
+                setTip("已保存至云端");
+                return true;
+            }else throw new Error("服务端存储失败");
+        }catch(e){
+            setTip(`云端保存失败：${e.message}`,true);
+            return false;
+        }
+    }
+
+    // 新增单条记录
+    async function addSportRecord(){
+        if(!currentPersonId){setTip("请先在上方选择要录入的孩子",true);return;}
+        const type = document.getElementById('sportType').value;
+        const date = document.getElementById('checkDate').value;
+        const time = document.getElementById('sportTime').value.trim();
+        const dist = document.getElementById('sportDist').value.trim();
+        const bestScore = document.getElementById('bestScore').value.trim();
+        const note = document.getElementById('sportNote').value.trim();
+        if(!time){setTip("请填写运动时长",true);return;}
+        if(!date){setTip("请选择打卡日期",true);return;}
+        sportList.push({type,time,dist,bestScore,note,date});
+        const ok = await savePersonRecord();
+        if(ok){
+            document.getElementById('sportTime').value = "";
+            document.getElementById('sportDist').value = "";
+            document.getElementById('bestScore').value = "";
+            document.getElementById('sportNote').value = "";
+            document.getElementById('checkDate').value = getTodayDate();
+            renderList(); renderDetailList(); renderAllChart();
+        }
+    }
+
+    // 单条删除
+    async function delRecord(idx){
+        sportList.splice(idx,1);
+        await savePersonRecord();
+        renderList(); renderDetailList(); renderAllChart();
+    }
+    // 批量删除
+    async function batchDelete(){
+        const chks = document.querySelectorAll(".check-item:checked");
+        if(chks.length===0){setTip("请勾选要删除的记录",true);return;}
+        const idxs = Array.from(chks).map(c=>Number(c.value)).sort((a,b)=>b-a);
+        idxs.forEach(i=>sportList.splice(i,1));
+        await savePersonRecord();
+        renderList(); renderDetailList(); renderAllChart();
+        setTip(`已删除${chks.length}条记录`);
+    }
+
+    // 录入清单渲染
+    function renderList(){
+        const wrap = document.getElementById("recordList");
+        if(sportList.length===0){wrap.innerHTML="<p style='color:#64748b;'>暂无运动记录</p>";return;}
+        let html = "";
+        sportList.forEach((item,i)=>{
+            html += `
+                <div class="list-item">
+                    <div>
+                        <div>打卡日期：${item.date}</div>
+                        <div>项目：${item.type} | 时长：${item.time}分钟</div>
+                        <div>数量合计：${item.dist||"无"} | 最优成绩：${item.bestScore||"无"}</div>
+                        <div>备注：${item.note||"无"}</div>
+                    </div>
+                    <button class="del-btn" onclick="delRecord(${i})">删除本条</button>
+                </div>
+            `
+        })
+        wrap.innerHTML = html;
+    }
+    // 明细带复选框
+    function renderDetailList(){
+        const wrap = document.getElementById("detailRecordList");
+        if(sportList.length===0){wrap.innerHTML="<p style='color:#64748b;'>暂无运动记录</p>";return;}
+        let html = "";
+        sportList.forEach((item,i)=>{
+            html += `
+                <div class="list-item-with-check">
+                    <input type="checkbox" class="check-item" value="${i}">
+                    <div style="flex:1;">
+                        <div>打卡日期：${item.date}</div>
+                        <div>项目：${item.type} | 时长：${item.time}分钟</div>
+                        <div>数量合计：${item.dist||"无"} | 最优成绩：${item.bestScore||"无"}</div>
+                        <div>备注：${item.note||"无"}</div>
+                    </div>
+                    <button class="del-btn" onclick="delRecord(${i})">删除</button>
+                </div>
+            `
+        })
+        wrap.innerHTML = html;
+    }
+
+    // Excel导出
+    function exportExcel(){
+        if(sportList.length===0){setTip("暂无记录无法导出",true);return;}
+        const table = [["打卡日期","运动项目","时长(分钟)","数量合计","最优成绩","备注"]];
+        sportList.forEach(it=>table.push([it.date,it.type,it.time,it.dist||"无",it.bestScore||"无",it.note||"无"]));
+        const ws = XLSX.utils.aoa_to_sheet(table);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb,ws,"运动记录");
+        XLSX.writeFile(wb,"萌娃运动打卡.xlsx");
+        setTip("Excel导出成功");
+    }
+
+    // 图表切换
+    function switchSportChart(type){
+        sportChartType = type;
+        document.querySelectorAll(".chart-switch-btn").forEach(b=>b.classList.remove("active"));
+        event.target.classList.add("active");
+        renderSportTrendChart();
+    }
+    // 每日堆叠柱状图（匹配截图样式）
+    function renderDayTimeChart(){
+        const dayMap = {};
+        const allDays = new Set();
+        const sportTypes = new Set();
+        sportList.forEach(it=>{
+            const d = it.date; const s = it.type; const t = Number(it.time);
+            allDays.add(d); sportTypes.add(s);
+            if(!dayMap[d]) dayMap[d] = {};
+            dayMap[d][s] = (dayMap[d][s]||0)+t;
+        })
+        const sortedDays = Array.from(allDays).sort();
+        const sportArr = Array.from(sportTypes);
+        const colors = ["#f97316","#2563eb","#16a34a","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"];
+        const datasets = [];
+        sportArr.forEach((sp,idx)=>{
+            const data = sortedDays.map(d=>dayMap[d][sp]||0);
+            datasets.push({label:sp,data,backgroundColor:colors[idx%colors.length],stack:"total"});
+        })
+        if(dayChartInstance) dayChartInstance.destroy();
+        const ctx = document.getElementById("dayTimeChart").getContext("2d");
+        dayChartInstance = new Chart(ctx,{
+            type:"bar",
+            data:{labels:sortedDays.map(d=>d.slice(5)),datasets},
+            options:{
+                responsive:true,maintainAspectRatio:false,
+                plugins:{
+                    title:{display:true,text:"每日各类运动时长堆叠统计图",font:{size:20}},
+                    legend:{position:"top"},
+                },
+                scales:{x:{stacked:true,title:{display:true,text:"日期"}},y:{stacked:true,title:{display:true,text:"运动总时长 (分钟)"},min:0},
+                animation:{onComplete:function(chart){
+                    const c = chart.ctx; c.fillStyle="#000"; c.font="bold 16px sans-serif";
+                    chart.data.labels.forEach((lab,i)=>{
+                        let total=0; chart.data.datasets.forEach(ds=>total+=ds.data[i]);
+                        const meta = chart.getDatasetMeta(0);
+                        const x = meta.data[i].x; const y = meta.data[i].y -8;
+                        c.textAlign="center"; c.fillText(`${total}分钟`,x,y);
+                    })
+                }}
+            }
+        })
+    }
+    // 单项趋势图
+    function renderSportTrendChart(){
+        const sportDayMap = {};
+        const allDate = new Set();
+        sportList.forEach(it=>{
+            const s = it.type; const d = it.date; const t = Number(it.time);
+            allDate.add(d);
+            if(!sportDayMap[s]) sportDayMap[s]={};
+            sportDayMap[s][d] = (sportDayMap[s][d]||0)+t;
+        })
+        const sortedDate = Array.from(allDate).sort();
+        const datasets = [];
+        const colorList = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"];
+        let cIdx=0;
+        Object.keys(sportDayMap).forEach(sp=>{
+            const arr = sortedDate.map(d=>sportDayMap[s][d]||0);
+            datasets.push({label:sp,data:arr,borderColor:colorList[cIdx%colorList.length],backgroundColor:colorList[cIdx%colorList.length]+"80",fill:sportChartType==="bar"});
+            cIdx++;
+        })
+        if(trendChartInstance) trendChartInstance.destroy();
+        const ctx = document.getElementById("sportTrendChart").getContext("2d");
+        trendChartInstance = new Chart(ctx,{
+            type:sportChartType,
+            data:{labels:sortedDate.map(d=>d.slice(5)),datasets},
+            options:{responsive:true,maintainAspectRatio:false}
+        })
+    }
+    // 最优成绩面板
+    function renderBestScorePanel(){
+        const bestMap = {};
+        sportList.forEach(it=>{
+            const s = it.type; const sc = it.bestScore?.trim();
+            if(!sc) return;
+            if(!bestMap[s] || bestMap[s].score < sc){
+                bestMap[s] = {score:sc,date:it.date};
+            }
+        })
+        const wrap = document.getElementById("bestScoreWrap");
+        if(Object.keys(bestMap).length===0){wrap.innerHTML="<p style='color:#64748b;'>暂无最优成绩记录</p>";return;}
+        let html = "";
+        Object.keys(bestMap).forEach(sp=>{
+            const info = bestMap[sp];
+            html += `
+                <div class="best-score-item">
+                    <div class="best-score-name">${sp}</div>
+                    <div>最优成绩：${info.score}</div>
+                    <div style="font-size:13px;color:#666;">记录日期：${info.date}</div>
+                </div>
+            `
+        })
+        wrap.innerHTML = html;
+    }
+    function renderAllChart(){
+        renderDayTimeChart(); renderSportTrendChart(); renderBestScorePanel();
+    }
+
+    // 标签切换
+    document.querySelectorAll('.top-btn-row button[data-tab]').forEach(btn=>{
+        btn.onclick = ()=>{
+            const tab = btn.dataset.tab;
+            document.querySelectorAll('.top-btn-row button[data-tab]').forEach(b=>b.classList.remove("active"));
+            document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove("active"));
+            btn.classList.add("active");
+            document.getElementById(tab).classList.add("active");
+            if(tab==="chart") renderAllChart();
+            if(tab==="detail") renderDetailList();
+        }
+    })
+
+    window.onload = async ()=>{
+        document.getElementById("checkDate").value = getTodayDate();
+        const savedUser = localStorage.getItem(STORAGE_KEYS.loginUser);
+        if(savedUser && Object.keys(JSON.parse(localStorage.getItem(STORAGE_KEYS.allUser)||"{}")).includes(savedUser)){
+            currentUser = savedUser;
+            document.getElementById("currentUserName").innerText = currentUser;
+            document.getElementById("authPanel").style.display = "none";
+            document.getElementById("mainPanel").style.display = "block";
+            await loadAllPersonData();
+            updatePageTitle();
+        }else{
+            setTip("请登录账号查看");
+        }
     }
 </script>
 </body>

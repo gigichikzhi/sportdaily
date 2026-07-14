@@ -182,12 +182,14 @@
             margin-top:16px;
             color:#2563eb;
             cursor:pointer;
+            font-size:16px;
+            user-select: none;
         }
     </style>
 </head>
 <body>
-    <h1 id="pageTitle">萌娃运动打卡 - 请选择孩子</h1>
-    <div class="tip-text" id="tip">加载中...</div>
+    <h1 id="pageTitle">萌娃运动打卡</h1>
+    <div class="tip-text" id="tip"></div>
 
     <!-- 登录/注册切换面板 -->
     <div id="authPanel">
@@ -203,7 +205,7 @@
                     <label>密码</label>
                     <input type="password" id="loginPwd" placeholder="请输入密码">
                 </div>
-                <button class="submit-cloud-btn" onclick="userLogin()" style="width:100%;margin-top:10px;">登录</button>
+                <button class="submit-cloud-btn" onclick="switchAuthTab()" style="width:100%;margin-top:10px;">登录</button>
                 <div class="switch-tab-text" onclick="switchAuthTab()">没有账号？去注册</div>
             </div>
             <!-- 注册表单 -->
@@ -385,41 +387,48 @@
         tipDom.className = isErr ? "tip-text tip-error" : "tip-text tip-success";
     }
 
-    // 切换登录/注册表单
+    // 切换登录/注册表单【修复核心：简化切换逻辑，无阻塞】
     function switchAuthTab(){
         const loginForm = document.getElementById("loginForm");
         const regForm = document.getElementById("registerForm");
         const title = document.getElementById("authTitle");
-        if(loginForm.style.display === "none"){
-            loginForm.style.display = "block";
-            regForm.style.display = "none";
-            title.innerText = "账号登录";
-        }else{
+        // 强制切换显示隐藏
+        if (loginForm.style.display !== "none") {
             loginForm.style.display = "none";
             regForm.style.display = "block";
             title.innerText = "新用户注册";
+        } else {
+            loginForm.style.display = "block";
+            regForm.style.display = "none";
+            title.innerText = "账号登录";
         }
     }
 
-    // 更新页面标题（显示当前孩子姓名）
+    // 更新页面标题（仅登录且选中孩子才拼接姓名）
     function updatePageTitle() {
         const titleEl = document.getElementById("pageTitle");
+        // 未登录固定只显示基础标题
+        if (!currentUser) {
+            titleEl.innerText = "萌娃运动打卡";
+            return;
+        }
+        // 登录但未选择孩子
         if (!currentPersonId) {
-            titleEl.innerText = "萌娃运动打卡 - 请选择孩子";
+            titleEl.innerText = "萌娃运动打卡";
             return;
         }
         let allPersons = [];
         if (isLocalEnv) {
             allPersons = JSON.parse(localStorage.getItem(STORAGE_KEYS.allPersons) || "[]");
             const target = allPersons.find(p => p.personId === currentPersonId);
-            titleEl.innerText = target ? `萌娃运动打卡 - ${target.name}` : "萌娃运动打卡 - 请选择孩子";
+            titleEl.innerText = target ? `萌娃运动打卡 - ${target.name}` : "萌娃运动打卡";
         } else {
             fetch(`/api/sport?mode=person&user=${currentUser}`)
                 .then(res => res.json())
                 .then(json => {
                     const all = json.allPersons || [];
                     const target = all.find(p => p.personId === currentPersonId);
-                    titleEl.innerText = target ? `萌娃运动打卡 - ${target.name}` : "萌娃运动打卡 - 请选择孩子";
+                    titleEl.innerText = target ? `萌娃运动打卡 - ${target.name}` : "萌娃运动打卡";
                 })
         }
     }
@@ -478,6 +487,7 @@
             setTip("手机号或密码错误，未注册请先注册",true);
             return;
         }
+        // 登录成功
         currentUser = phone;
         localStorage.setItem(STORAGE_KEYS.loginUser, phone);
         document.getElementById("currentUserName").innerText = phone;
@@ -920,16 +930,24 @@
 
     window.onload = async ()=>{
         document.getElementById("checkDate").value = getTodayDate();
-        const savedUser = localStorage.getItem(STORAGE_KEYS.loginUser);
-        if(savedUser && Object.keys(JSON.parse(localStorage.getItem(STORAGE_KEYS.allUser)||"{}")).includes(savedUser)){
-            currentUser = savedUser;
-            document.getElementById("currentUserName").innerText = currentUser;
-            document.getElementById("authPanel").style.display = "none";
-            document.getElementById("mainPanel").style.display = "block";
-            await loadAllPersonData();
-            updatePageTitle();
-        }else{
-            setTip("请登录账号查看");
+        try {
+            const savedUser = localStorage.getItem(STORAGE_KEYS.loginUser);
+            const allUserRaw = localStorage.getItem(STORAGE_KEYS.allUser) || "{}";
+            const allUserObj = JSON.parse(allUserRaw);
+            if (savedUser && Object.keys(allUserObj).includes(savedUser)) {
+                currentUser = savedUser;
+                document.getElementById("currentUserName").innerText = currentUser;
+                document.getElementById("authPanel").style.display = "none";
+                document.getElementById("mainPanel").style.display = "block";
+                await loadAllPersonData();
+                updatePageTitle();
+                setTip("页面加载完成，请选择孩子");
+            } else {
+                setTip("请登录账号查看");
+            }
+        } catch (err) {
+            setTip("页面加载完成，请登录账号");
+            console.error("初始化捕获异常：", err);
         }
     }
 </script>

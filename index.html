@@ -78,6 +78,7 @@
             font-weight: 600;
             margin-bottom: 16px;
             color: #1e293b;
+            text-align:center;
         }
         .form-item {margin-bottom: 16px;}
         .form-item label {
@@ -147,10 +148,21 @@
         .tab-panel {display: none;}
         .tab-panel.active {display: block;}
         .login-card {max-width: 420px;margin: 60px auto 0;}
-        .chart-box {width: 100%;height: 320px;margin-bottom: 12px;}
+        .chart-wrap {
+            position: relative;
+            width: 100%;
+            height: min(32vh, 220px);
+            max-height: 220px;
+            margin-bottom: 8px;
+        }
+        .chart-wrap canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
         .chart-switch-btn {
             padding: 6px 12px;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
+            margin-right: 6px;
             border: 1px solid #2563eb;
             background: white;
             color: #2563eb;
@@ -158,6 +170,28 @@
             cursor: pointer;
         }
         .chart-switch-btn.active {background: #2563eb;color: white;}
+        .day-range-bar {
+            display:flex;
+            flex-wrap:wrap;
+            align-items:center;
+            gap:8px;
+            margin-bottom:12px;
+        }
+        .day-range-custom {
+            display:flex;
+            flex-wrap:wrap;
+            align-items:center;
+            gap:6px;
+            margin-left:auto;
+        }
+        .day-range-custom input[type="date"] {
+            padding:6px 8px;
+            border:1px solid #cbd5e1;
+            border-radius:6px;
+            font-size:14px;
+            max-width:138px;
+        }
+        .day-range-custom .chart-switch-btn {margin:0;}
         .best-score-item {
             padding: 12px;
             border: 1px solid #dbeafe;
@@ -165,6 +199,35 @@
             margin-bottom: 8px;
         }
         .best-score-name {font-weight: 600;color: #2563eb;margin-bottom: 4px;}
+        .optional-tag {
+            color: #94a3b8;
+            font-size: 13px;
+            font-weight: 400;
+            margin-left: 4px;
+        }
+        .sport-type-charts {display:flex;flex-direction:column;gap:16px;}
+        .sport-type-chart-block {
+            border:1px solid #e2e8f0;
+            border-radius:12px;
+            padding:12px;
+            background:#f8fafc;
+        }
+        .sport-type-chart-title {
+            font-size:15px;
+            font-weight:600;
+            color:#1e293b;
+            margin-bottom:8px;
+        }
+        .sport-type-chart-wrap {
+            position:relative;
+            width:100%;
+            height:min(28vh,180px);
+            max-height:180px;
+        }
+        .sport-type-chart-wrap canvas {
+            width:100% !important;
+            height:100% !important;
+        }
         .person-item {
             display: flex;
             justify-content: space-between;
@@ -176,26 +239,57 @@
         }
         .person-active {background:#dbeafe;}
         .share-row {display:flex;gap:8px;margin-top:10px;}
-        .share-input {flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:8px;}
+        .share-input {
+            flex:1;
+            padding:10px;
+            border:1px solid #cbd5e1;
+            border-radius:8px;
+            background:#f1f5f9;
+            color:#64748b;
+            cursor:default;
+            outline:none;
+        }
         .switch-tab-text {
+            display:block;
             text-align:center;
             margin-top:16px;
             color:#2563eb;
-            cursor:pointer;
             font-size:16px;
             user-select: none;
+            text-decoration:none;
+            cursor:pointer;
+            background:none;
+            border:none;
+            width:100%;
+            font-family:inherit;
         }
+        .collapse-header {
+            width:100%;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            background:none;
+            border:none;
+            cursor:pointer;
+            padding:0;
+            text-align:left;
+            font-family:inherit;
+        }
+        .collapse-header .card-title {margin-bottom:0;text-align:left;}
+        .collapse-brief {flex:1;font-size:14px;color:#64748b;text-align:right;}
+        .collapse-arrow {color:#64748b;font-size:12px;transition:transform .2s;}
+        .collapse-arrow.open {transform:rotate(180deg);}
+        .collapse-body {margin-top:16px;}
     </style>
 </head>
 <body>
     <h1 id="pageTitle">萌娃运动打卡</h1>
     <div class="tip-text" id="tip"></div>
 
-    <!-- 登录/注册切换面板 -->
     <div id="authPanel">
         <div class="card login-card">
             <div class="card-title" style="text-align:center" id="authTitle">账号登录</div>
-            <!-- 登录表单 -->
             <div id="loginForm">
                 <div class="form-item">
                     <label>手机号</label>
@@ -205,10 +299,9 @@
                     <label>密码</label>
                     <input type="password" id="loginPwd" placeholder="请输入密码">
                 </div>
-                <button class="submit-cloud-btn" onclick="switchAuthTab()" style="width:100%;margin-top:10px;">登录</button>
-                <div class="switch-tab-text" onclick="switchAuthTab()">没有账号？去注册</div>
+                <button class="submit-cloud-btn" id="btnLogin">登录</button>
+                <button type="button" class="switch-tab-text" id="linkReg">没有账号？去注册</button>
             </div>
-            <!-- 注册表单 -->
             <div id="registerForm" style="display:none;">
                 <div class="form-item">
                     <label>手机号</label>
@@ -222,53 +315,53 @@
                     <label>确认密码</label>
                     <input type="password" id="regPwd2" placeholder="再次输入密码">
                 </div>
-                <button class="submit-cloud-btn" onclick="userRegister()" style="width:100%;margin-top:10px;">注册账号</button>
-                <div class="switch-tab-text" onclick="switchAuthTab()">已有账号？去登录</div>
+                <button class="submit-cloud-btn" id="btnRegister">注册账号</button>
+                <button type="button" class="switch-tab-text" id="linkLogin">已有账号？去登录</button>
             </div>
         </div>
     </div>
 
-    <!-- 主程序面板（登录后） -->
     <div id="mainPanel" style="display:none;">
         <div class="user-bar">
             <span>当前账号：<b id="currentUserName"></b></span>
-            <button class="logout-btn" onclick="logout()">退出登录</button>
+            <button class="logout-btn" id="btnLogout">退出登录</button>
         </div>
 
-        <!-- 孩子人员管理面板 -->
-        <div class="card">
-            <div class="card-title">孩子人员管理</div>
-            <div style="display:flex;gap:12px;margin-bottom:16px;">
-                <button class="action-btn green-btn" onclick="openCreatePerson()">新建孩子</button>
-                <button class="action-btn blue-btn" onclick="bindPersonById()">通过ID绑定孩子</button>
-            </div>
-            <div id="personListWrap"></div>
-            <!-- 新建弹窗 -->
-            <div id="createPersonForm" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #eee;">
-                <div class="form-item">
-                    <label>孩子姓名</label>
-                    <input type="text" id="newPersonName" placeholder="输入孩子姓名">
+        <div class="card" id="personManageCard">
+            <button type="button" class="collapse-header" id="btnTogglePersonManage">
+                <span class="card-title">孩子人员管理</span>
+                <span class="collapse-brief" id="personManageBrief"></span>
+                <span class="collapse-arrow" id="personManageArrow">▼</span>
+            </button>
+            <div class="collapse-body" id="personManageBody" style="display:none;">
+                <div style="display:flex;gap:12px;margin-bottom:16px;">
+                    <button class="action-btn green-btn" id="btnCreatePerson">新建孩子</button>
+                    <button class="action-btn blue-btn" id="btnBindPerson">通过ID绑定孩子</button>
                 </div>
-                <button class="submit-cloud-btn" onclick="createNewPerson()">创建人员</button>
-            </div>
-            <!-- 绑定弹窗 -->
-            <div id="bindPersonForm" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #eee;">
-                <div class="form-item">
-                    <label>输入分享的人员ID</label>
-                    <input type="text" id="bindPersonIdInput" placeholder="粘贴对方分享的人员ID">
+                <div id="personListWrap"></div>
+                <div id="createPersonForm" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #eee;">
+                    <div class="form-item">
+                        <label>孩子姓名</label>
+                        <input type="text" id="newPersonName" placeholder="输入孩子姓名">
+                    </div>
+                    <button class="submit-cloud-btn" id="btnSaveNewPerson">创建人员</button>
                 </div>
-                <button class="submit-cloud-btn" onclick="bindPerson()">绑定该孩子</button>
+                <div id="bindPersonForm" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #eee;">
+                    <div class="form-item">
+                        <label>输入分享的人员ID</label>
+                        <input type="text" id="bindPersonIdInput" placeholder="粘贴对方分享的人员ID">
+                    </div>
+                    <button class="submit-cloud-btn" id="btnDoBind">绑定该孩子</button>
+                </div>
             </div>
         </div>
 
-        <!-- 顶部功能切换 -->
         <div class="top-btn-row">
             <button class="active" data-tab="input">每日打卡录入</button>
             <button data-tab="detail">运动明细记录</button>
             <button data-tab="chart">运动统计报表</button>
         </div>
 
-        <!-- 打卡录入 -->
         <div class="tab-panel active" id="input">
             <div class="card">
                 <div class="card-title">添加当日运动项目</div>
@@ -278,34 +371,25 @@
                 </div>
                 <div class="form-item">
                     <label>运动类型</label>
-                    <select id="sportType">
-                        <option value="跑步">跑步</option>
-                        <option value="骑自行车">骑自行车</option>
-                        <option value="爬山">爬山</option>
-                        <option value="羽毛球">羽毛球</option>
-                        <option value="徒步">徒步</option>
-                        <option value="游泳">游泳</option>
-                        <option value="跳绳">跳绳</option>
-                        <option value="跳操">跳操</option>
-                    </select>
+                    <select id="sportType"></select>
                 </div>
                 <div class="form-item">
                     <label>运动时长 (分钟)</label>
                     <input type="number" id="sportTime" placeholder="请输入时长">
                 </div>
                 <div class="form-item">
-                    <label>数量合计 (选填)</label>
-                    <input type="text" id="sportDist" placeholder="例如：5公里 / 3组">
+                    <label>数量合计 <span class="optional-tag">选填</span></label>
+                    <input type="text" id="sportDist" placeholder="可不填，例如：5公里 / 3组" autocomplete="off">
                 </div>
                 <div class="form-item">
-                    <label>最优成绩 (选填)</label>
-                    <input type="text" id="bestScore" placeholder="本次最佳成绩记录">
+                    <label>最优成绩 <span class="optional-tag">选填</span></label>
+                    <input type="text" id="bestScore" placeholder="可不填，本次最佳成绩记录" autocomplete="off">
                 </div>
                 <div class="form-item">
-                    <label>备注: 孩子运动状态、天气、进步情况</label>
-                    <textarea id="sportNote" rows="4"></textarea>
+                    <label>备注 <span class="optional-tag">选填</span></label>
+                    <textarea id="sportNote" rows="4" placeholder="孩子运动状态、天气、进步情况（可不填）"></textarea>
                 </div>
-                <button class="submit-cloud-btn" onclick="addSportRecord()">保存</button>
+                <button class="submit-cloud-btn" id="btnAddRecord">保存</button>
             </div>
             <div class="card">
                 <div class="card-title">运动清单</div>
@@ -313,31 +397,37 @@
             </div>
         </div>
 
-        <!-- 明细记录 -->
         <div class="tab-panel" id="detail">
             <div class="card">
                 <div class="card-title">运动明细记录</div>
                 <div style="display:flex; gap:12px; margin-bottom:16px;">
-                    <button class="action-btn blue-btn" onclick="exportExcel()">导出到Excel</button>
-                    <button class="action-btn red-btn" onclick="batchDelete()">删除选中项</button>
+                    <button class="action-btn blue-btn" id="btnExport">导出到Excel</button>
+                    <button class="action-btn red-btn" id="btnBatchDel">删除选中项</button>
                 </div>
                 <div id="detailRecordList"></div>
             </div>
         </div>
 
-        <!-- 统计报表 -->
         <div class="tab-panel" id="chart">
             <div class="card">
-                <div class="card-title">1. 每日各类运动时长堆叠统计图</div>
-                <canvas class="chart-box" id="dayTimeChart"></canvas>
+                <div class="card-title">1. 每日运动时长统计</div>
+                <div id="dayRangeBtns" class="day-range-bar">
+                    <button type="button" class="chart-switch-btn active" data-day-range="7">近7天</button>
+                    <button type="button" class="chart-switch-btn" data-day-range="30">近30天</button>
+                    <button type="button" class="chart-switch-btn" data-day-range="90">近90天</button>
+                    <button type="button" class="chart-switch-btn" data-day-range="all">全部</button>
+                    <span class="day-range-custom">
+                        <input type="date" id="chartStartDate" title="开始日期">
+                        <span style="color:#64748b;font-size:13px;">至</span>
+                        <input type="date" id="chartEndDate" title="结束日期">
+                        <button type="button" class="chart-switch-btn" id="btnApplyChartRange">筛选</button>
+                    </span>
+                </div>
+                <div class="chart-wrap"><canvas id="dayTimeChart"></canvas></div>
             </div>
             <div class="card">
-                <div class="card-title">2. 单项运动趋势统计</div>
-                <div>
-                    <button class="chart-switch-btn active" onclick="switchSportChart('bar')">柱状图</button>
-                    <button class="chart-switch-btn" onclick="switchSportChart('line')">曲线图</button>
-                </div>
-                <canvas class="chart-box" id="sportTrendChart"></canvas>
+                <div class="card-title">2. 各运动按日统计</div>
+                <div id="sportSummaryWrap" class="sport-type-charts"></div>
             </div>
             <div class="card">
                 <div class="card-title">3. 各类运动最优成绩</div>
@@ -347,52 +437,10 @@
     </div>
 
 <script>
-    const tipDom = document.getElementById('tip');
-    let sportList = [];
-    let sportChartType = "bar";
-    let dayChartInstance = null;
-    let trendChartInstance = null;
-    let currentUser = ""; // 当前登录手机号
-    let currentPersonId = ""; // 当前操作孩子PID
-    const isLocalEnv = window.location.protocol === "file:";
-
-    // 存储key常量
-    const STORAGE_KEYS = {
-        loginUser: "sportLoginPhone",
-        allUser: "sport_all_user",
-        allPersons: "sport_all_persons",
-        userBindPersons: (u)=>`sport_bind_${u}`,
-        personRecords: (pid)=>`sport_rec_${pid}`
-    }
-
-    // 日期工具
-    function getTodayDate() {
-        const d = new Date();
-        const y = d.getFullYear();
-        let m = d.getMonth()+1, day = d.getDate();
-        m = m<10?"0"+m:m; day = day<10?"0"+day:day;
-        return `${y}-${m}-${day}`;
-    }
-    function genPersonId(){
-        return "PID_"+Date.now()+"_"+Math.floor(Math.random()*1000);
-    }
-    // 校验手机号11位数字
-    function checkPhone(phone){
-        return /^1[3-9]\d{10}$/.test(phone);
-    }
-
-    // 提示
-    function setTip(text, isErr=false){
-        tipDom.textContent = text;
-        tipDom.className = isErr ? "tip-text tip-error" : "tip-text tip-success";
-    }
-
-    // 切换登录/注册表单【修复核心：简化切换逻辑，无阻塞】
     function switchAuthTab(){
         const loginForm = document.getElementById("loginForm");
         const regForm = document.getElementById("registerForm");
         const title = document.getElementById("authTitle");
-        // 强制切换显示隐藏
         if (loginForm.style.display !== "none") {
             loginForm.style.display = "none";
             regForm.style.display = "block";
@@ -404,15 +452,67 @@
         }
     }
 
-    // 更新页面标题（仅登录且选中孩子才拼接姓名）
+    const tipDom = document.getElementById('tip');
+    let sportList = [];
+    let dayChartRange = 7; // 默认近7天，"all" 全部，"custom" 自定义
+    let chartCustomStart = "";
+    let chartCustomEnd = "";
+    let dayChartInstance = null;
+    let sportTypeChartInstances = [];
+    let currentUser = "";
+    let currentPersonId = "";
+    let personManageExpanded = false; // 默认折叠；无孩子时会自动展开
+    const isLocalEnv = window.location.protocol === "file:"
+        || location.hostname === "localhost"
+        || location.hostname === "127.0.0.1";
+
+    const STORAGE_KEYS = {
+        loginUser: "sportLoginPhone",
+        allUser: "sport_all_user",
+        allPersons: "sport_all_persons",
+        userBindPersons: (u)=>`sport_bind_${u}`,
+        personRecords: (pid)=>`sport_rec_${pid}`,
+        lastPerson: (u)=>`sport_last_person_${u}`,
+        lastSportType: (u)=>`sport_last_type_${u}`
+    }
+
+    const SPORT_TYPE_LIST = ["跑步","骑自行车","爬山","羽毛球","徒步","游泳","跳绳","跳操"];
+
+    function initSportTypeSelect(){
+        const sel = document.getElementById("sportType");
+        const sorted = SPORT_TYPE_LIST.slice().sort((a,b)=>a.localeCompare(b,"zh"));
+        sel.innerHTML = sorted.map(s=>`<option value="${s}">${s}</option>`).join("");
+        const last = currentUser
+            ? localStorage.getItem(STORAGE_KEYS.lastSportType(currentUser))
+            : "";
+        sel.value = (last && SPORT_TYPE_LIST.includes(last)) ? last : sorted[0];
+    }
+
+    function getTodayDate() {
+        const d = new Date();
+        const y = d.getFullYear();
+        let m = d.getMonth()+1, day = d.getDate();
+        m = m<10?"0"+m:m; day = day<10?"0"+day:day;
+        return `${y}-${m}-${day}`;
+    }
+    function genPersonId(){
+        return "PID_"+Date.now()+"_"+Math.floor(Math.random()*1000);
+    }
+    function checkPhone(phone){
+        return /^1[3-9]\d{9}$/.test(phone);
+    }
+
+    function setTip(text, isErr=false){
+        tipDom.textContent = text;
+        tipDom.className = isErr ? "tip-text tip-error" : "tip-text tip-success";
+    }
+
     function updatePageTitle() {
         const titleEl = document.getElementById("pageTitle");
-        // 未登录固定只显示基础标题
         if (!currentUser) {
             titleEl.innerText = "萌娃运动打卡";
             return;
         }
-        // 登录但未选择孩子
         if (!currentPersonId) {
             titleEl.innerText = "萌娃运动打卡";
             return;
@@ -433,7 +533,6 @@
         }
     }
 
-    // 手机号注册
     async function userRegister(){
         const phone = document.getElementById("regPhone").value.trim();
         const pwd1 = document.getElementById("regPwd").value.trim();
@@ -468,7 +567,6 @@
         document.getElementById("regPwd2").value = "";
     }
 
-    // 手机号登录
     async function userLogin(){
         const phone = document.getElementById("loginPhone").value.trim();
         const pwd = document.getElementById("loginPwd").value.trim();
@@ -487,19 +585,16 @@
             setTip("手机号或密码错误，未注册请先注册",true);
             return;
         }
-        // 登录成功
         currentUser = phone;
         localStorage.setItem(STORAGE_KEYS.loginUser, phone);
         document.getElementById("currentUserName").innerText = phone;
         document.getElementById("authPanel").style.display = "none";
         document.getElementById("mainPanel").style.display = "block";
         document.getElementById("checkDate").value = getTodayDate();
+        initSportTypeSelect();
         await loadAllPersonData();
-        updatePageTitle();
-        setTip(`登录成功，当前账号：${phone}`);
     }
 
-    // 退出登录
     function logout(){
         currentUser = ""; currentPersonId = ""; sportList=[];
         localStorage.removeItem(STORAGE_KEYS.loginUser);
@@ -509,7 +604,6 @@
         setTip("已退出登录");
     }
 
-    // 加载全局人员+当前账号绑定列表
     async function loadAllPersonData(){
         let allPersons = [];
         let bindPids = [];
@@ -522,17 +616,82 @@
             allPersons = json.allPersons || [];
             bindPids = json.bindPids || [];
         }
+        const bindPersonArr = allPersons.filter(p=>bindPids.includes(p.personId));
+        const targetId = resolveDefaultPersonId(bindPersonArr);
+        if(targetId){
+            currentPersonId = targetId;
+            localStorage.setItem(STORAGE_KEYS.lastPerson(currentUser), targetId);
+            await loadPersonRecord();
+            renderList(); renderDetailList(); renderAllChart();
+        }else{
+            currentPersonId = "";
+            sportList = [];
+            renderList(); renderDetailList();
+        }
         renderPersonList(allPersons, bindPids);
+        updatePageTitle();
+        if(targetId){
+            const name = bindPersonArr.find(p=>p.personId===targetId)?.name || "";
+            setTip(`当前孩子：${name}`);
+        }else if(bindPersonArr.length===0){
+            setTip("暂无孩子，请新建或绑定");
+        }else{
+            setTip("请选择要操作的孩子");
+        }
     }
 
-    // 渲染人员列表
-    function renderPersonList(allPersons, bindPids){
-        const wrap = document.getElementById("personListWrap");
-        const bindPersonArr = allPersons.filter(p=>bindPids.includes(p.personId));
-        if(bindPersonArr.length===0){
-            wrap.innerHTML = "<p style='color:#64748b;'>暂无绑定孩子，请新建或输入ID绑定</p>";
+    function resolveDefaultPersonId(bindPersonArr){
+        if(bindPersonArr.length===0) return "";
+        if(bindPersonArr.length===1) return bindPersonArr[0].personId;
+        const last = localStorage.getItem(STORAGE_KEYS.lastPerson(currentUser));
+        if(last && bindPersonArr.some(p=>p.personId===last)) return last;
+        if(currentPersonId && bindPersonArr.some(p=>p.personId===currentPersonId)) return currentPersonId;
+        return "";
+    }
+
+    function setPersonManageExpanded(expanded){
+        personManageExpanded = !!expanded;
+        const body = document.getElementById("personManageBody");
+        const arrow = document.getElementById("personManageArrow");
+        if(!body) return;
+        body.style.display = personManageExpanded ? "block" : "none";
+        if(arrow) arrow.classList.toggle("open", personManageExpanded);
+    }
+    function togglePersonManage(){
+        setPersonManageExpanded(!personManageExpanded);
+    }
+    function updatePersonManageBrief(bindPersonArr){
+        const brief = document.getElementById("personManageBrief");
+        if(!brief) return;
+        if(!bindPersonArr || bindPersonArr.length===0){
+            brief.textContent = "暂无孩子";
             return;
         }
+        const current = bindPersonArr.find(p=>p.personId===currentPersonId);
+        if(current){
+            brief.textContent = `当前：${current.name}` + (bindPersonArr.length>1 ? `（共${bindPersonArr.length}人）` : "");
+        }else{
+            brief.textContent = `已绑定 ${bindPersonArr.length} 人`;
+        }
+    }
+
+    function renderPersonList(allPersons, bindPids){
+        const wrap = document.getElementById("personListWrap");
+        const createForm = document.getElementById("createPersonForm");
+        const bindForm = document.getElementById("bindPersonForm");
+        const bindPersonArr = allPersons.filter(p=>bindPids.includes(p.personId));
+        updatePersonManageBrief(bindPersonArr);
+        if(bindPersonArr.length===0){
+            wrap.innerHTML = "<p style='color:#64748b;'>暂无绑定孩子，请新建或输入ID绑定</p>";
+            createForm.style.display = "block";
+            bindForm.style.display = "none";
+            setPersonManageExpanded(true); // 无孩子时默认展开
+            return;
+        }
+        // 有孩子时默认保持折叠（除非用户已手动展开）
+        if(!personManageExpanded) setPersonManageExpanded(false);
+        createForm.style.display = "none";
+        bindForm.style.display = "none";
         let html = "";
         bindPersonArr.forEach(p=>{
             const isCreator = p.createUser === currentUser;
@@ -540,47 +699,68 @@
             html += `
                 <div class="person-item ${isActive?'person-active':''}">
                     <div>
-                        <div><b>${p.name}</b> ${isCreator?"(创建人，可分享ID)":"(共享绑定)"}</div>
+                        <div><b>${p.name}</b> ${isCreator?"(创建人，可分享ID)":"(共享绑定)"}${isActive?" · 当前选中":""}</div>
                         <div style="font-size:13px;color:#666;">人员ID：${p.personId}</div>
                         <div class="share-row">
-                            <input class="share-input" value="${p.personId}" readonly>
-                            <button onclick="copyShareId('${p.personId}')">复制ID</button>
+                            <input class="share-input" value="${p.personId}" readonly tabindex="-1">
+                            <button data-pid="${p.personId}">复制ID</button>
                         </div>
                     </div>
-                    <div style="display:flex;gap:6px;">
-                        <button onclick="switchCurrentPerson('${p.personId}')" class="submit-cloud-btn">查看录入</button>
-                        ${isCreator?`<button class="del-btn" onclick="deletePerson('${p.personId}')">删除孩子</button>`:""}
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+                        ${isActive
+                            ? `<button class="submit-cloud-btn" disabled style="opacity:.55;cursor:default;">当前选中</button>`
+                            : `<button class="submit-cloud-btn" data-switch-pid="${p.personId}">选择该孩子</button>`}
+                        ${isCreator?`<button class="del-btn" data-del-pid="${p.personId}">删除孩子</button>`:""}
                     </div>
                 </div>
             `;
         })
         wrap.innerHTML = html;
+        wrap.onclick = function(e){
+            const pid = e.target.dataset.pid || e.target.dataset.switchPid || e.target.dataset.delPid;
+            if(!pid) return;
+            if(e.target.dataset.pid) copyShareId(pid);
+            if(e.target.dataset.switchPid) switchCurrentPerson(pid);
+            if(e.target.dataset.delPid) deletePerson(pid);
+        }
     }
-    // 复制分享ID
     async function copyShareId(pid){
         await navigator.clipboard.writeText(pid);
         setTip("人员ID已复制，可发给配偶绑定");
     }
-    // 切换当前操作孩子
     async function switchCurrentPerson(pid){
         currentPersonId = pid;
+        localStorage.setItem(STORAGE_KEYS.lastPerson(currentUser), pid);
         await loadPersonRecord();
         renderList(); renderDetailList(); renderAllChart();
+        let allPersons = [];
+        let bindPids = [];
+        if(isLocalEnv){
+            allPersons = JSON.parse(localStorage.getItem(STORAGE_KEYS.allPersons) || "[]");
+            bindPids = JSON.parse(localStorage.getItem(STORAGE_KEYS.userBindPersons(currentUser)) || "[]");
+        }else{
+            const res = await fetch(`/api/sport?mode=person&user=${currentUser}`);
+            const json = await res.json();
+            allPersons = json.allPersons || [];
+            bindPids = json.bindPids || [];
+        }
+        renderPersonList(allPersons, bindPids);
         updatePageTitle();
-        setTip("已切换至当前孩子数据");
+        const name = allPersons.find(p=>p.personId===pid)?.name || "";
+        setTip(`已选择孩子：${name}`);
     }
 
-    // 新建人员面板
     function openCreatePerson(){
+        setPersonManageExpanded(true);
         document.getElementById("createPersonForm").style.display = "block";
         document.getElementById("bindPersonForm").style.display = "none";
     }
     function bindPersonById(){
+        setPersonManageExpanded(true);
         document.getElementById("bindPersonForm").style.display = "block";
         document.getElementById("createPersonForm").style.display = "none";
     }
 
-    // 创建新人员（当前账号为创建者）
     async function createNewPerson(){
         const name = document.getElementById("newPersonName").value.trim();
         if(!name){setTip("请输入孩子姓名",true);return;}
@@ -611,12 +791,11 @@
         }
         document.getElementById("newPersonName").value = "";
         document.getElementById("createPersonForm").style.display = "none";
+        localStorage.setItem(STORAGE_KEYS.lastPerson(currentUser), pid);
         await loadAllPersonData();
-        updatePageTitle();
         setTip(`创建成功，人员ID：${pid}，可复制分享给家人`);
     }
 
-    // 通过ID绑定他人创建的人员
     async function bindPerson(){
         const pid = document.getElementById("bindPersonIdInput").value.trim();
         if(!pid){setTip("请输入人员ID",true);return;}
@@ -641,12 +820,11 @@
         }
         document.getElementById("bindPersonIdInput").value = "";
         document.getElementById("bindPersonForm").style.display = "none";
+        if(!currentPersonId) localStorage.setItem(STORAGE_KEYS.lastPerson(currentUser), pid);
         await loadAllPersonData();
-        updatePageTitle();
         setTip(`绑定成功，现在可查看${target.name}的运动记录`);
     }
 
-    // 删除人员（仅创建者可操作）
     async function deletePerson(pid){
         if(!confirm("删除后该孩子所有运动记录将全部清除，确定？")) return;
         let allPersons = isLocalEnv
@@ -667,12 +845,12 @@
             currentPersonId = "";
             sportList = []; renderList(); renderDetailList(); renderAllChart();
         }
+        const last = localStorage.getItem(STORAGE_KEYS.lastPerson(currentUser));
+        if(last === pid) localStorage.removeItem(STORAGE_KEYS.lastPerson(currentUser));
         await loadAllPersonData();
-        updatePageTitle();
         setTip("人员及对应运动记录已删除");
     }
 
-    // 加载当前选中孩子的运动记录
     async function loadPersonRecord(){
         if(!currentPersonId){sportList=[];return;}
         if(isLocalEnv){
@@ -690,7 +868,6 @@
         }
     }
 
-    // 保存当前孩子记录
     async function savePersonRecord(){
         if(!currentPersonId) return false;
         if(isLocalEnv){
@@ -715,12 +892,12 @@
         }
     }
 
-    // 新增单条记录
     async function addSportRecord(){
         if(!currentPersonId){setTip("请先在上方选择要录入的孩子",true);return;}
         const type = document.getElementById('sportType').value;
         const date = document.getElementById('checkDate').value;
         const time = document.getElementById('sportTime').value.trim();
+        // 数量合计、最优成绩、备注均为选填，允许为空
         const dist = document.getElementById('sportDist').value.trim();
         const bestScore = document.getElementById('bestScore').value.trim();
         const note = document.getElementById('sportNote').value.trim();
@@ -729,22 +906,23 @@
         sportList.push({type,time,dist,bestScore,note,date});
         const ok = await savePersonRecord();
         if(ok){
+            localStorage.setItem(STORAGE_KEYS.lastSportType(currentUser), type);
+            document.getElementById('sportType').value = type; // 保持为上一次运动
             document.getElementById('sportTime').value = "";
             document.getElementById('sportDist').value = "";
             document.getElementById('bestScore').value = "";
             document.getElementById('sportNote').value = "";
             document.getElementById('checkDate').value = getTodayDate();
             renderList(); renderDetailList(); renderAllChart();
+            setTip(`保存成功：${type} ${time}分钟`);
         }
     }
 
-    // 单条删除
     async function delRecord(idx){
         sportList.splice(idx,1);
         await savePersonRecord();
         renderList(); renderDetailList(); renderAllChart();
     }
-    // 批量删除
     async function batchDelete(){
         const chks = document.querySelectorAll(".check-item:checked");
         if(chks.length===0){setTip("请勾选要删除的记录",true);return;}
@@ -755,7 +933,6 @@
         setTip(`已删除${chks.length}条记录`);
     }
 
-    // 录入清单渲染
     function renderList(){
         const wrap = document.getElementById("recordList");
         if(sportList.length===0){wrap.innerHTML="<p style='color:#64748b;'>暂无运动记录</p>";return;}
@@ -769,13 +946,16 @@
                         <div>数量合计：${item.dist||"无"} | 最优成绩：${item.bestScore||"无"}</div>
                         <div>备注：${item.note||"无"}</div>
                     </div>
-                    <button class="del-btn" onclick="delRecord(${i})">删除本条</button>
+                    <button class="del-btn" data-delidx="${i}">删除本条</button>
                 </div>
             `
         })
         wrap.innerHTML = html;
+        wrap.onclick = function(e){
+            const idx = e.target.dataset.delidx;
+            if(idx !== undefined) delRecord(Number(idx));
+        }
     }
-    // 明细带复选框
     function renderDetailList(){
         const wrap = document.getElementById("detailRecordList");
         if(sportList.length===0){wrap.innerHTML="<p style='color:#64748b;'>暂无运动记录</p>";return;}
@@ -790,14 +970,17 @@
                         <div>数量合计：${item.dist||"无"} | 最优成绩：${item.bestScore||"无"}</div>
                         <div>备注：${item.note||"无"}</div>
                     </div>
-                    <button class="del-btn" onclick="delRecord(${i})">删除</button>
+                    <button class="del-btn" data-delidx="${i}">删除</button>
                 </div>
             `
         })
         wrap.innerHTML = html;
+        wrap.onclick = function(e){
+            const idx = e.target.dataset.delidx;
+            if(idx !== undefined) delRecord(Number(idx));
+        }
     }
 
-    // Excel导出
     function exportExcel(){
         if(sportList.length===0){setTip("暂无记录无法导出",true);return;}
         const table = [["打卡日期","运动项目","时长(分钟)","数量合计","最优成绩","备注"]];
@@ -809,84 +992,289 @@
         setTip("Excel导出成功");
     }
 
-    // 图表切换
-    function switchSportChart(type){
-        sportChartType = type;
-        document.querySelectorAll(".chart-switch-btn").forEach(b=>b.classList.remove("active"));
-        event.target.classList.add("active");
-        renderSportTrendChart();
+    function switchDayRange(range){
+        dayChartRange = range === "all" ? "all" : Number(range);
+        chartCustomStart = "";
+        chartCustomEnd = "";
+        document.querySelectorAll("#dayRangeBtns .chart-switch-btn[data-day-range]").forEach(b=>{
+            b.classList.toggle("active", String(b.dataset.dayRange) === String(range));
+        });
+        document.getElementById("btnApplyChartRange").classList.remove("active");
+        renderDayTimeChart();
+        renderSportSummary();
     }
-    // 每日堆叠柱状图（匹配截图样式）
+    function applyCustomChartRange(){
+        const start = document.getElementById("chartStartDate").value;
+        const end = document.getElementById("chartEndDate").value;
+        if(!start || !end){setTip("请选择开始和结束日期",true);return;}
+        if(start > end){setTip("开始日期不能晚于结束日期",true);return;}
+        dayChartRange = "custom";
+        chartCustomStart = start;
+        chartCustomEnd = end;
+        document.querySelectorAll("#dayRangeBtns .chart-switch-btn[data-day-range]").forEach(b=>b.classList.remove("active"));
+        document.getElementById("btnApplyChartRange").classList.add("active");
+        renderDayTimeChart();
+        renderSportSummary();
+        setTip(`已筛选：${start} 至 ${end}`);
+    }
+    function getChartRangeBounds(){
+        const today = getTodayDate();
+        if(dayChartRange === "custom"){
+            return {
+                start: chartCustomStart,
+                end: chartCustomEnd,
+                label: `${chartCustomStart.slice(5)}~${chartCustomEnd.slice(5)}`,
+                fillEmpty: true,
+            };
+        }
+        if(dayChartRange === "all"){
+            const allDays = Array.from(new Set(sportList.map(it=>it.date).filter(Boolean))).sort();
+            return {
+                start: allDays[0] || today,
+                end: allDays[allDays.length-1] || today,
+                label: "全部",
+                fillEmpty: false,
+                dates: allDays.length ? allDays : [today],
+            };
+        }
+        const start = getDateOffset(today, -(dayChartRange - 1));
+        return {
+            start,
+            end: today,
+            label: `近${dayChartRange}天`,
+            fillEmpty: true,
+        };
+    }
+    function getDateOffset(dateStr, offsetDays){
+        const d = new Date(dateStr + "T00:00:00");
+        d.setDate(d.getDate() + offsetDays);
+        const y = d.getFullYear();
+        let m = d.getMonth()+1, day = d.getDate();
+        m = m<10?"0"+m:m; day = day<10?"0"+day:day;
+        return `${y}-${m}-${day}`;
+    }
+    function buildDateRange(startDate, endDate){
+        const list = [];
+        let cur = startDate;
+        while(cur <= endDate){
+            list.push(cur);
+            cur = getDateOffset(cur, 1);
+        }
+        return list;
+    }
+    function getFilteredSportList(){
+        const bounds = getChartRangeBounds();
+        return sportList.filter(it=>it.date >= bounds.start && it.date <= bounds.end);
+    }
     function renderDayTimeChart(){
+        const bounds = getChartRangeBounds();
+        const dates = bounds.dates
+            ? bounds.dates
+            : buildDateRange(bounds.start, bounds.end);
         const dayMap = {};
-        const allDays = new Set();
         const sportTypes = new Set();
+        dates.forEach(d=>dayMap[d]={});
         sportList.forEach(it=>{
-            const d = it.date; const s = it.type; const t = Number(it.time);
-            allDays.add(d); sportTypes.add(s);
-            if(!dayMap[d]) dayMap[d] = {};
-            dayMap[d][s] = (dayMap[d][s]||0)+t;
-        })
-        const sortedDays = Array.from(allDays).sort();
+            if(dayMap[it.date] === undefined) return;
+            const s = it.type || "其他";
+            sportTypes.add(s);
+            dayMap[it.date][s] = (dayMap[it.date][s]||0) + (Number(it.time)||0);
+        });
         const sportArr = Array.from(sportTypes);
-        const colors = ["#f97316","#2563eb","#16a34a","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"];
-        const datasets = [];
-        sportArr.forEach((sp,idx)=>{
-            const data = sortedDays.map(d=>dayMap[d][sp]||0);
-            datasets.push({label:sp,data,backgroundColor:colors[idx%colors.length],stack:"total"});
-        })
+        const colorMap = {
+            "跑步":"#f97316","骑自行车":"#2563eb","爬山":"#16a34a","羽毛球":"#eab308",
+            "徒步":"#0d9488","游泳":"#06b6d4","跳绳":"#ec4899","跳操":"#8b5cf6","其他":"#64748b"
+        };
+        const fallback = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"];
+        const totals = dates.map(d=>sportArr.reduce((sum,sp)=>sum+(dayMap[d][sp]||0),0));
+        const datasets = sportArr.length
+            ? sportArr.map((sp,idx)=>({
+                label: sp,
+                data: dates.map(d=>dayMap[d][sp]||0),
+                backgroundColor: colorMap[sp] || fallback[idx % fallback.length],
+                stack: "day",
+                maxBarThickness: 32,
+                borderWidth: 0,
+            }))
+            : [{
+                label: "运动时长",
+                data: dates.map(()=>0),
+                backgroundColor: "#2563eb",
+                stack: "day",
+                maxBarThickness: 32,
+            }];
+        const rangeLabel = bounds.label;
         if(dayChartInstance) dayChartInstance.destroy();
         const ctx = document.getElementById("dayTimeChart").getContext("2d");
         dayChartInstance = new Chart(ctx,{
             type:"bar",
-            data:{labels:sortedDays.map(d=>d.slice(5)),datasets},
+            data:{labels: dates.map(d=>d.slice(5)), datasets},
             options:{
-                responsive:true,maintainAspectRatio:false,
+                responsive:true,
+                maintainAspectRatio:false,
+                layout:{padding:{top:18,right:4,bottom:0,left:0}},
                 plugins:{
-                    title:{display:true,text:"每日各类运动时长堆叠统计图",font:{size:20}},
-                    legend:{position:"top"},
+                    title:{display:true,text:`每日运动时长（${rangeLabel}）`,font:{size:15}},
+                    legend:{display:sportArr.length>1, position:"top", labels:{boxWidth:12, font:{size:11}}},
+                    tooltip:{
+                        callbacks:{
+                            footer:(items)=>{
+                                const total = items.reduce((s,it)=>s+(it.parsed.y||0),0);
+                                return total ? `合计：${total} 分钟` : "";
+                            }
+                        }
+                    },
+                    dayTotalLabels:{ totals }
                 },
-                scales:{x:{stacked:true,title:{display:true,text:"日期"}},y:{stacked:true,title:{display:true,text:"运动总时长 (分钟)"},min:0},
-                animation:{onComplete:function(chart){
-                    const c = chart.ctx; c.fillStyle="#000"; c.font="bold 16px sans-serif";
-                    chart.data.labels.forEach((lab,i)=>{
-                        let total=0; chart.data.datasets.forEach(ds=>total+=ds.data[i]);
-                        const meta = chart.getDatasetMeta(0);
-                        const x = meta.data[i].x; const y = meta.data[i].y -8;
-                        c.textAlign="center"; c.fillText(`${total}分钟`,x,y);
-                    })
-                }}
-            }
-        })
+                scales:{
+                    x:{
+                        stacked:true,
+                        title:{display:true,text:"日期",font:{size:12}},
+                        ticks:{
+                            autoSkip:true,
+                            maxTicksLimit: dates.length > 14 ? 8 : dates.length,
+                            maxRotation:0,
+                            minRotation:0,
+                            font:{size:11},
+                        },
+                    },
+                    y:{
+                        stacked:true,
+                        title:{display:true,text:"时长 (分钟)",font:{size:12}},
+                        min:0,
+                        ticks:{precision:0,font:{size:11}},
+                    },
+                },
+            },
+            plugins:[{
+                id:"dayTotalLabels",
+                afterDatasetsDraw(chart){
+                    const totals = chart.options.plugins.dayTotalLabels?.totals || [];
+                    const {ctx, scales} = chart;
+                    if(!scales.x || !scales.y) return;
+                    ctx.save();
+                    ctx.font = "12px system-ui,sans-serif";
+                    ctx.fillStyle = "#1e293b";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "bottom";
+                    totals.forEach((total,i)=>{
+                        if(!total) return;
+                        const x = scales.x.getPixelForValue(i);
+                        const y = scales.y.getPixelForValue(total);
+                        ctx.fillText(String(total), x, y - 4);
+                    });
+                    ctx.restore();
+                }
+            }]
+        });
     }
-    // 单项趋势图
-    function renderSportTrendChart(){
-        const sportDayMap = {};
-        const allDate = new Set();
-        sportList.forEach(it=>{
-            const s = it.type; const d = it.date; const t = Number(it.time);
-            allDate.add(d);
-            if(!sportDayMap[s]) sportDayMap[s]={};
-            sportDayMap[s][d] = (sportDayMap[s][d]||0)+t;
-        })
-        const sortedDate = Array.from(allDate).sort();
-        const datasets = [];
-        const colorList = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"];
-        let cIdx=0;
-        Object.keys(sportDayMap).forEach(sp=>{
-            const arr = sortedDate.map(d=>sportDayMap[s][d]||0);
-            datasets.push({label:sp,data:arr,borderColor:colorList[cIdx%colorList.length],backgroundColor:colorList[cIdx%colorList.length]+"80",fill:sportChartType==="bar"});
-            cIdx++;
-        })
-        if(trendChartInstance) trendChartInstance.destroy();
-        const ctx = document.getElementById("sportTrendChart").getContext("2d");
-        trendChartInstance = new Chart(ctx,{
-            type:sportChartType,
-            data:{labels:sortedDate.map(d=>d.slice(5)),datasets},
-            options:{responsive:true,maintainAspectRatio:false}
-        })
+    const SPORT_COLOR_MAP = {
+        "跑步":"#f97316",
+        "骑自行车":"#2563eb",
+        "爬山":"#16a34a",
+        "羽毛球":"#eab308",
+        "徒步":"#0d9488",
+        "游泳":"#06b6d4",
+        "跳绳":"#ec4899",
+        "跳操":"#8b5cf6",
+    };
+    function renderSportSummary(){
+        const wrap = document.getElementById("sportSummaryWrap");
+        sportTypeChartInstances.forEach(c=>{ try{c.destroy();}catch(e){} });
+        sportTypeChartInstances = [];
+        const list = getFilteredSportList();
+        if(list.length===0){
+            wrap.innerHTML = "<p style='color:#64748b;'>当前周期暂无运动记录</p>";
+            return;
+        }
+        const bySport = {};
+        list.forEach(it=>{
+            const s = it.type || "其他";
+            if(!bySport[s]) bySport[s] = {};
+            const d = it.date;
+            if(!bySport[s][d]) bySport[s][d] = {time:0, dists:[]};
+            bySport[s][d].time += Number(it.time) || 0;
+            const dist = (it.dist||"").trim();
+            if(dist) bySport[s][d].dists.push(dist);
+        });
+        const sports = Object.keys(bySport);
+        wrap.innerHTML = sports.map((sp,idx)=>{
+            const color = SPORT_COLOR_MAP[sp] || "#64748b";
+            return `
+                <div class="sport-type-chart-block">
+                    <div class="sport-type-chart-title" style="color:${color}">${sp}</div>
+                    <div class="sport-type-chart-wrap"><canvas id="sportTypeChart_${idx}"></canvas></div>
+                </div>
+            `;
+        }).join("");
+
+        sports.forEach((sp,idx)=>{
+            const dayMap = bySport[sp];
+            const dates = Object.keys(dayMap).sort(); // 仅有该运动的日期
+            const times = dates.map(d=>dayMap[d].time);
+            const qtyLabels = dates.map(d=>dayMap[d].dists.length ? dayMap[d].dists.join("、") : "");
+            const color = SPORT_COLOR_MAP[sp] || "#64748b";
+            const canvas = document.getElementById(`sportTypeChart_${idx}`);
+            if(!canvas) return;
+            const chart = new Chart(canvas.getContext("2d"),{
+                type:"bar",
+                data:{
+                    labels: dates.map(d=>d.slice(5)),
+                    datasets:[{
+                        label:"时长(分钟)",
+                        data: times,
+                        backgroundColor: color,
+                        borderRadius:4,
+                        maxBarThickness:36,
+                    }]
+                },
+                options:{
+                    responsive:true,
+                    maintainAspectRatio:false,
+                    layout:{padding:{top:16,right:4,bottom:0,left:0}},
+                    plugins:{
+                        legend:{display:false},
+                        tooltip:{
+                            callbacks:{
+                                afterBody:(items)=>{
+                                    const i = items[0]?.dataIndex;
+                                    if(i===undefined) return "";
+                                    const q = qtyLabels[i];
+                                    return q ? `数量：${q}` : "";
+                                }
+                            }
+                        },
+                        barValueLabels:{ values: times }
+                    },
+                    scales:{
+                        x:{title:{display:true,text:"日期",font:{size:11}}, ticks:{font:{size:11},maxRotation:0}},
+                        y:{title:{display:true,text:"时长(分钟)",font:{size:11}}, min:0, ticks:{precision:0,font:{size:11}}},
+                    }
+                },
+                plugins:[{
+                    id:"barValueLabels",
+                    afterDatasetsDraw(chart){
+                        const values = chart.options.plugins.barValueLabels?.values || [];
+                        const {ctx, scales} = chart;
+                        if(!scales.x || !scales.y) return;
+                        ctx.save();
+                        ctx.font = "12px system-ui,sans-serif";
+                        ctx.fillStyle = "#1e293b";
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "bottom";
+                        values.forEach((v,i)=>{
+                            if(!v) return;
+                            const x = scales.x.getPixelForValue(i);
+                            const y = scales.y.getPixelForValue(v);
+                            ctx.fillText(String(v), x, y - 4);
+                        });
+                        ctx.restore();
+                    }
+                }]
+            });
+            sportTypeChartInstances.push(chart);
+        });
     }
-    // 最优成绩面板
     function renderBestScorePanel(){
         const bestMap = {};
         sportList.forEach(it=>{
@@ -912,10 +1300,9 @@
         wrap.innerHTML = html;
     }
     function renderAllChart(){
-        renderDayTimeChart(); renderSportTrendChart(); renderBestScorePanel();
+        renderDayTimeChart(); renderSportSummary(); renderBestScorePanel();
     }
 
-    // 标签切换
     document.querySelectorAll('.top-btn-row button[data-tab]').forEach(btn=>{
         btn.onclick = ()=>{
             const tab = btn.dataset.tab;
@@ -928,8 +1315,28 @@
         }
     })
 
+    // 脚本在 body 末尾，元素已存在，直接绑定更可靠
+    document.getElementById("linkReg").onclick = switchAuthTab;
+    document.getElementById("linkLogin").onclick = switchAuthTab;
+    document.getElementById("btnLogin").onclick = userLogin;
+    document.getElementById("btnRegister").onclick = userRegister;
+    document.getElementById("btnLogout").onclick = logout;
+    document.getElementById("btnTogglePersonManage").onclick = togglePersonManage;
+    document.getElementById("btnCreatePerson").onclick = openCreatePerson;
+    document.getElementById("btnBindPerson").onclick = bindPersonById;
+    document.getElementById("btnSaveNewPerson").onclick = createNewPerson;
+    document.getElementById("btnDoBind").onclick = bindPerson;
+    document.getElementById("btnAddRecord").onclick = addSportRecord;
+    document.getElementById("btnExport").onclick = exportExcel;
+    document.getElementById("btnBatchDel").onclick = batchDelete;
+    document.querySelectorAll("#dayRangeBtns .chart-switch-btn[data-day-range]").forEach(b=>{
+        b.onclick = ()=>switchDayRange(b.dataset.dayRange);
+    });
+    document.getElementById("btnApplyChartRange").onclick = applyCustomChartRange;
+
     window.onload = async ()=>{
         document.getElementById("checkDate").value = getTodayDate();
+        initSportTypeSelect();
         try {
             const savedUser = localStorage.getItem(STORAGE_KEYS.loginUser);
             const allUserRaw = localStorage.getItem(STORAGE_KEYS.allUser) || "{}";
@@ -939,15 +1346,14 @@
                 document.getElementById("currentUserName").innerText = currentUser;
                 document.getElementById("authPanel").style.display = "none";
                 document.getElementById("mainPanel").style.display = "block";
+                initSportTypeSelect();
                 await loadAllPersonData();
-                updatePageTitle();
-                setTip("页面加载完成，请选择孩子");
             } else {
                 setTip("请登录账号查看");
             }
         } catch (err) {
             setTip("页面加载完成，请登录账号");
-            console.error("初始化捕获异常：", err);
+            console.error(err);
         }
     }
 </script>

@@ -540,31 +540,38 @@
         if(!checkPhone(phone)){setTip("请输入合法11位手机号",true);return;}
         if(pwd1.length < 6){setTip("密码至少6位",true);return;}
         if(pwd1 !== pwd2){setTip("两次输入密码不一致",true);return;}
-        let userMap = {};
-        if(isLocalEnv){
-            const local = localStorage.getItem(STORAGE_KEYS.allUser);
-            userMap = local ? JSON.parse(local) : {};
-        }else{
-            const res = await fetch(`/api/sport?mode=getUser`);
-            const json = await res.json();
-            userMap = json.userMap || {};
+        try{
+            let userMap = {};
+            if(isLocalEnv){
+                const local = localStorage.getItem(STORAGE_KEYS.allUser);
+                userMap = local ? JSON.parse(local) : {};
+            }else{
+                const res = await fetch(`/api/sport?mode=getUser`);
+                if(!res.ok) throw new Error(`服务异常(${res.status})`);
+                const json = await res.json();
+                userMap = json.userMap || {};
+            }
+            if(userMap[phone]){setTip("该手机号已注册，请直接登录",true);return;}
+            userMap[phone] = pwd1;
+            if(isLocalEnv){
+                localStorage.setItem(STORAGE_KEYS.allUser, JSON.stringify(userMap));
+            }else{
+                const saveRes = await fetch("/api/sport?mode=saveUser",{
+                    method:"POST",
+                    headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify({mode:"saveUser", userMap})
+                });
+                if(!saveRes.ok) throw new Error(`保存失败(${saveRes.status})`);
+            }
+            setTip("注册成功，请登录");
+            switchAuthTab();
+            document.getElementById("regPhone").value = "";
+            document.getElementById("regPwd").value = "";
+            document.getElementById("regPwd2").value = "";
+        }catch(err){
+            console.error(err);
+            setTip(`注册失败：${err.message || "请稍后重试"}`,true);
         }
-        if(userMap[phone]){setTip("该手机号已注册，请直接登录",true);return;}
-        userMap[phone] = pwd1;
-        if(isLocalEnv){
-            localStorage.setItem(STORAGE_KEYS.allUser, JSON.stringify(userMap));
-        }else{
-            await fetch("/api/sport",{
-                method:"POST",
-                headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({mode:"saveUser", userMap})
-            })
-        }
-        setTip("注册成功，请登录");
-        switchAuthTab();
-        document.getElementById("regPhone").value = "";
-        document.getElementById("regPwd").value = "";
-        document.getElementById("regPwd2").value = "";
     }
 
     async function userLogin(){
@@ -572,27 +579,34 @@
         const pwd = document.getElementById("loginPwd").value.trim();
         if(!checkPhone(phone)){setTip("请输入合法11位手机号",true);return;}
         if(!pwd){setTip("请输入密码",true);return;}
-        let userMap = {};
-        if(isLocalEnv){
-            const local = localStorage.getItem(STORAGE_KEYS.allUser);
-            userMap = local ? JSON.parse(local) : {};
-        }else{
-            const res = await fetch(`/api/sport?mode=getUser`);
-            const json = await res.json();
-            userMap = json.userMap || {};
+        try{
+            let userMap = {};
+            if(isLocalEnv){
+                const local = localStorage.getItem(STORAGE_KEYS.allUser);
+                userMap = local ? JSON.parse(local) : {};
+            }else{
+                const res = await fetch(`/api/sport?mode=getUser`);
+                if(!res.ok) throw new Error(`服务异常(${res.status})`);
+                const json = await res.json();
+                userMap = json.userMap || {};
+            }
+            if(!userMap[phone] || userMap[phone] !== pwd){
+                setTip("手机号或密码错误，未注册请先注册",true);
+                return;
+            }
+            currentUser = phone;
+            localStorage.setItem(STORAGE_KEYS.loginUser, phone);
+            document.getElementById("currentUserName").innerText = phone;
+            document.getElementById("authPanel").style.display = "none";
+            document.getElementById("mainPanel").style.display = "block";
+            document.getElementById("checkDate").value = getTodayDate();
+            initSportTypeSelect();
+            await loadAllPersonData();
+            setTip(`登录成功，当前账号：${phone}`);
+        }catch(err){
+            console.error(err);
+            setTip(`登录失败：${err.message || "请稍后重试"}`,true);
         }
-        if(!userMap[phone] || userMap[phone] !== pwd){
-            setTip("手机号或密码错误，未注册请先注册",true);
-            return;
-        }
-        currentUser = phone;
-        localStorage.setItem(STORAGE_KEYS.loginUser, phone);
-        document.getElementById("currentUserName").innerText = phone;
-        document.getElementById("authPanel").style.display = "none";
-        document.getElementById("mainPanel").style.display = "block";
-        document.getElementById("checkDate").value = getTodayDate();
-        initSportTypeSelect();
-        await loadAllPersonData();
     }
 
     function logout(){

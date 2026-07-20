@@ -1674,35 +1674,33 @@
             return;
         }
         const mergeByDate = document.getElementById("detailMergeByDate")?.checked !== false;
+        const groups = [];
+        const map = new Map();
+        rows.forEach(row => {
+            if(!map.has(row.item.date)){
+                const g = { date: row.item.date, rows: [] };
+                map.set(row.item.date, g);
+                groups.push(g);
+            }
+            map.get(row.item.date).rows.push(row);
+        });
+        // 按日期合并=折叠展示；取消勾选=同样按日期分组，但默认展开明细
+        const openClass = mergeByDate ? "" : " open";
         let html = "";
-        if(mergeByDate){
-            const groups = [];
-            const map = new Map();
-            rows.forEach(row => {
-                if(!map.has(row.item.date)){
-                    const g = { date: row.item.date, rows: [] };
-                    map.set(row.item.date, g);
-                    groups.push(g);
-                }
-                map.get(row.item.date).rows.push(row);
-            });
-            groups.forEach(g => {
-                html += `
-                    <div class="detail-date-group">
-                        <div class="detail-date-title">
-                            <input type="checkbox" class="detail-date-check" data-date="${escapeHtml(g.date)}" aria-label="选择${escapeHtml(g.date)}">
-                            <span class="detail-date-label">${escapeHtml(g.date)}（${g.rows.length}条）</span>
-                            <span class="detail-date-arrow">▼</span>
-                        </div>
-                        <div class="detail-date-body">
-                            ${g.rows.map(r => buildDetailRowHtml(r.item, r.index)).join("")}
-                        </div>
+        groups.forEach(g => {
+            html += `
+                <div class="detail-date-group${openClass}">
+                    <div class="detail-date-title">
+                        <input type="checkbox" class="detail-date-check" data-date="${escapeHtml(g.date)}" aria-label="选择${escapeHtml(g.date)}">
+                        <span class="detail-date-label">${escapeHtml(g.date)}（${g.rows.length}条）</span>
+                        <span class="detail-date-arrow">▼</span>
                     </div>
-                `;
-            });
-        }else{
-            html = rows.map(r => buildDetailRowHtml(r.item, r.index)).join("");
-        }
+                    <div class="detail-date-body">
+                        ${g.rows.map(r => buildDetailRowHtml(r.item, r.index)).join("")}
+                    </div>
+                </div>
+            `;
+        });
         wrap.innerHTML = html;
         bindDetailListEvents(wrap);
     }

@@ -247,14 +247,23 @@
             cursor: pointer;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 8px;
+            gap: 10px;
             user-select: none;
+        }
+        .detail-date-title .detail-date-check {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            flex: 0 0 auto;
+        }
+        .detail-date-title .detail-date-label {
+            flex: 1;
         }
         .detail-date-title .detail-date-arrow {
             font-size: 12px;
             color: #64748b;
             transition: transform .2s;
+            flex: 0 0 auto;
         }
         .detail-date-group.open .detail-date-title .detail-date-arrow {
             transform: rotate(180deg);
@@ -1578,6 +1587,10 @@
     }
     function bindDetailListEvents(wrap){
         wrap.onclick = function(e){
+            if(e.target.classList.contains("detail-date-check")){
+                e.stopPropagation();
+                return;
+            }
             const title = e.target.closest(".detail-date-title");
             if(title){
                 const group = title.closest(".detail-date-group");
@@ -1591,8 +1604,31 @@
             const idx = e.target.dataset.delidx;
             if(idx !== undefined) delRecord(Number(idx));
         };
+        wrap.querySelectorAll(".detail-date-check").forEach(chk => {
+            chk.addEventListener("click", (e) => e.stopPropagation());
+            chk.addEventListener("change", () => {
+                const group = chk.closest(".detail-date-group");
+                if(!group) return;
+                group.querySelectorAll(".check-item").forEach(itemChk => {
+                    itemChk.checked = chk.checked;
+                });
+                syncDetailSelectAllState();
+            });
+        });
         wrap.querySelectorAll(".check-item").forEach(chk => {
-            chk.addEventListener("change", syncDetailSelectAllState);
+            chk.addEventListener("change", () => {
+                const group = chk.closest(".detail-date-group");
+                if(group){
+                    const items = group.querySelectorAll(".check-item");
+                    const checked = group.querySelectorAll(".check-item:checked");
+                    const dayChk = group.querySelector(".detail-date-check");
+                    if(dayChk){
+                        dayChk.checked = items.length > 0 && items.length === checked.length;
+                        dayChk.indeterminate = checked.length > 0 && checked.length < items.length;
+                    }
+                }
+                syncDetailSelectAllState();
+            });
         });
     }
     function syncDetailSelectAllState(){
@@ -1602,11 +1638,23 @@
         if(!selectAll) return;
         selectAll.checked = all.length > 0 && all.length === checked.length;
         selectAll.indeterminate = checked.length > 0 && checked.length < all.length;
+        document.querySelectorAll("#detailRecordList .detail-date-group").forEach(group => {
+            const items = group.querySelectorAll(".check-item");
+            const itemChecked = group.querySelectorAll(".check-item:checked");
+            const dayChk = group.querySelector(".detail-date-check");
+            if(!dayChk) return;
+            dayChk.checked = items.length > 0 && items.length === itemChecked.length;
+            dayChk.indeterminate = itemChecked.length > 0 && itemChecked.length < items.length;
+        });
     }
     function toggleDetailSelectAll(){
         const checked = document.getElementById("detailSelectAll").checked;
         document.querySelectorAll("#detailRecordList .check-item").forEach(chk => {
             chk.checked = checked;
+        });
+        document.querySelectorAll("#detailRecordList .detail-date-check").forEach(chk => {
+            chk.checked = checked;
+            chk.indeterminate = false;
         });
         syncDetailSelectAllState();
     }
@@ -1641,8 +1689,9 @@
             groups.forEach(g => {
                 html += `
                     <div class="detail-date-group">
-                        <div class="detail-date-title" data-toggle-date="${escapeHtml(g.date)}">
-                            <span>${escapeHtml(g.date)}（${g.rows.length}条）</span>
+                        <div class="detail-date-title">
+                            <input type="checkbox" class="detail-date-check" data-date="${escapeHtml(g.date)}" aria-label="选择${escapeHtml(g.date)}">
+                            <span class="detail-date-label">${escapeHtml(g.date)}（${g.rows.length}条）</span>
                             <span class="detail-date-arrow">▼</span>
                         </div>
                         <div class="detail-date-body">

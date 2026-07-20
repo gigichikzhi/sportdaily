@@ -94,6 +94,23 @@ export default async (req, context) => {
             return jsonResponse({ success: true });
         }
 
+        // 2.5 运动类型（按账号）
+        if (mode === "sportTypes") {
+            if (!user) {
+                return jsonResponse({ success: false, error: "缺少用户" }, 400);
+            }
+            const typesKey = `sportTypes_${user}`;
+            if (req.method === "GET") {
+                const types = await readJSON(store, typesKey, []);
+                return jsonResponse({ types: Array.isArray(types) ? types : [] });
+            }
+            if (req.method === "POST") {
+                const types = Array.isArray(body.types) ? body.types : [];
+                await store.setJSON(typesKey, types);
+                return jsonResponse({ success: true });
+            }
+        }
+
         // 3. 运动记录
         const recKey = `rec_${pid}`;
         if (req.method === "GET") {

@@ -151,6 +151,17 @@
         .green-btn {background: #16a34a;}
         .person-mode-btn {background: #86efac; color: #14532d;}
         .person-mode-btn.active {background: #15803d; color: #fff;}
+        .sport-type-row {
+            display: flex;
+            gap: 8px;
+            align-items: stretch;
+        }
+        .sport-type-row select {flex: 1;}
+        .sport-type-add-btn {
+            flex: 0 0 auto;
+            padding: 0 16px;
+            white-space: nowrap;
+        }
         .list-item {
             padding: 16px;
             border: 1px solid #e2e8f0;
@@ -416,7 +427,10 @@
                 </div>
                 <div class="form-item">
                     <label>运动类型</label>
-                    <select id="sportType"></select>
+                    <div class="sport-type-row">
+                        <select id="sportType"></select>
+                        <button type="button" class="action-btn green-btn sport-type-add-btn" id="btnAddSportType">新增</button>
+                    </div>
                 </div>
                 <div class="form-item">
                     <label>运动时长 (分钟)</label>
@@ -518,19 +532,115 @@
         userBindPersons: (u)=>`sport_bind_${u}`,
         personRecords: (pid)=>`sport_rec_${pid}`,
         lastPerson: (u)=>`sport_last_person_${u}`,
-        lastSportType: (u)=>`sport_last_type_${u}`
+        lastSportType: (u)=>`sport_last_type_${u}`,
+        customSportTypes: (u)=>`sport_custom_types_${u}`
     }
 
-    const SPORT_TYPE_LIST = ["跑步","骑自行车","爬山","羽毛球","徒步","游泳","跳绳","跳操"];
+    const DEFAULT_SPORT_TYPES = ["跑步","骑自行车","爬山","羽毛球","徒步","游泳","跳绳","跳操"];
+    let sportTypeList = DEFAULT_SPORT_TYPES.slice();
 
-    function initSportTypeSelect(){
+    function mergeSportTypes(customTypes){
+        const merged = DEFAULT_SPORT_TYPES.slice();
+        (customTypes || []).forEach(t => {
+            const name = String(t || "").trim();
+            if(name && !merged.includes(name)) merged.push(name);
+        });
+        return merged.sort((a,b)=>a.localeCompare(b,"zh"));
+    }
+    function findSimilarSportTypes(name, list){
+        const target = String(name || "").trim();
+        if(!target) return [];
+        return (list || []).filter(item => {
+            if(item === target) return false;
+            return item.includes(target) || target.includes(item);
+        });
+    }
+    async function fetchCustomSportTypes(){
+        if(!currentUser || isAdminAccount(currentUser)) return [];
+        if(isLocalEnv){
+            const local = localStorage.getItem(STORAGE_KEYS.customSportTypes(currentUser));
+            return local ? JSON.parse(local) : [];
+        }
+        const res = await fetch(
+            `/api/sport?mode=sportTypes&user=${encodeURIComponent(currentUser)}`,
+            { cache: "no-store" }
+        );
+        if(!res.ok) throw new Error(`服务异常(${res.status})`);
+        const json = await res.json();
+        return Array.isArray(json.types) ? json.types : [];
+    }
+    async function saveCustomSportTypes(types){
+        if(!currentUser || isAdminAccount(currentUser)) return;
+        const cleaned = (types || []).map(t => String(t || "").trim()).filter(Boolean);
+        if(isLocalEnv){
+            localStorage.setItem(STORAGE_KEYS.customSportTypes(currentUser), JSON.stringify(cleaned));
+            return;
+        }
+        const res = await fetch(`/api/sport?mode=sportTypes&user=${encodeURIComponent(currentUser)}`, {
+            method: "POST",
+            cache: "no-store",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({ mode:"sportTypes", user: currentUser, types: cleaned })
+        });
+        if(!res.ok) throw new Error(`保存失败(${res.status})`);
+        const json = await res.json().catch(() => ({}));
+        if(json.success === false) throw new Error(json.error || "保存失败");
+    }
+    async function initSportTypeSelect(preferredType){
         const sel = document.getElementById("sportType");
-        const sorted = SPORT_TYPE_LIST.slice().sort((a,b)=>a.localeCompare(b,"zh"));
-        sel.innerHTML = sorted.map(s=>`<option value="${s}">${s}</option>`).join("");
-        const last = currentUser
-            ? localStorage.getItem(STORAGE_KEYS.lastSportType(currentUser))
-            : "";
-        sel.value = (last && SPORT_TYPE_LIST.includes(last)) ? last : sorted[0];
+        if(!sel) return;
+        try{
+            const customTypes = await fetchCustomSportTypes();
+            sportTypeList = mergeSportTypes(customTypes);
+        }catch(err){
+            console.error(err);
+            sportTypeList = DEFAULT_SPORT_TYPES.slice().sort((a,b)=>a.localeCompare(b,"zh"));
+        }
+        sel.innerHTML = sportTypeList.map(s=>`<option value="${s}">${s}</option>`).join("");
+        const last = preferredType
+            || (currentUser ? localStorage.getItem(STORAGE_KEYS.lastSportType(currentUser)) : "");
+        sel.value = (last && sportTypeList.includes(last)) ? last : (sportTypeList[0] || "");
+    }
+    async function addCustomSportType(){
+        if(!currentUser || isAdminAccount(currentUser)){
+            setTip("请先登录普通账号后再新增运动类型", true);
+            return;
+        }
+        const raw = prompt("请输入要新增的运动类型名称：");
+        if(raw == null) return;
+        const name = String(raw).trim();
+        if(!name){ setTip("运动类型不能为空", true); return; }
+        if(name.length > 20){ setTip("运动类型名称请控制在20字以内", true); return; }
+
+        let customTypes = [];
+        try{
+            customTypes = await fetchCustomSportTypes();
+        }catch(err){
+            setTip(`读取运动类型失败：${err.message || "请稍后重试"}`, true);
+            return;
+        }
+        const allTypes = mergeSportTypes(customTypes);
+        if(allTypes.includes(name)){
+            setTip(`「${name}」已存在，无需重复添加`, true);
+            document.getElementById("sportType").value = name;
+            return;
+        }
+        const similar = findSimilarSportTypes(name, allTypes);
+        const ok = similar.length
+            ? confirm(`已有类似项目：${similar.join("、")}。\n仍要添加「${name}」吗？`)
+            : confirm(`确定添加运动类型「${name}」？`);
+        if(!ok) return;
+
+        try{
+            customTypes.push(name);
+            await saveCustomSportTypes(customTypes);
+            await initSportTypeSelect(name);
+            localStorage.setItem(STORAGE_KEYS.lastSportType(currentUser), name);
+            setTip(`已添加运动类型：${name}`);
+        }catch(err){
+            console.error(err);
+            setTip(`添加失败：${err.message || "请稍后重试"}`, true);
+        }
     }
 
     function getTodayDate() {
@@ -600,7 +710,7 @@
         document.getElementById("adminPanel").style.display = "none";
         document.getElementById("mainPanel").style.display = "block";
         document.getElementById("checkDate").value = getTodayDate();
-        initSportTypeSelect();
+        await initSportTypeSelect();
         await loadAllPersonData();
     }
     async function enterAdmin(){
@@ -1550,6 +1660,7 @@
     document.getElementById("btnSaveNewPerson").onclick = createNewPerson;
     document.getElementById("btnDoBind").onclick = bindPerson;
     document.getElementById("btnAddRecord").onclick = addSportRecord;
+    document.getElementById("btnAddSportType").onclick = addCustomSportType;
     document.getElementById("btnExport").onclick = exportExcel;
     document.getElementById("btnBatchDel").onclick = batchDelete;
     document.querySelectorAll("#dayRangeBtns .chart-switch-btn[data-day-range]").forEach(b=>{
@@ -1559,7 +1670,7 @@
 
     window.onload = async ()=>{
         document.getElementById("checkDate").value = getTodayDate();
-        initSportTypeSelect();
+        await initSportTypeSelect();
         try {
             const savedUser = localStorage.getItem(STORAGE_KEYS.loginUser);
             if (isAdminAccount(savedUser)) {

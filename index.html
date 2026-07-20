@@ -244,6 +244,29 @@
             font-weight: 600;
             font-size: 15px;
             border-bottom: 1px solid #dbeafe;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            user-select: none;
+        }
+        .detail-date-title .detail-date-arrow {
+            font-size: 12px;
+            color: #64748b;
+            transition: transform .2s;
+        }
+        .detail-date-group.open .detail-date-title .detail-date-arrow {
+            transform: rotate(180deg);
+        }
+        .detail-date-group:not(.open) .detail-date-title {
+            border-bottom: none;
+        }
+        .detail-date-body {
+            display: none;
+        }
+        .detail-date-group.open .detail-date-body {
+            display: block;
         }
         .detail-date-group .list-item-with-check {
             margin: 0;
@@ -1555,6 +1578,12 @@
     }
     function bindDetailListEvents(wrap){
         wrap.onclick = function(e){
+            const title = e.target.closest(".detail-date-title");
+            if(title){
+                const group = title.closest(".detail-date-group");
+                if(group) group.classList.toggle("open");
+                return;
+            }
             if(e.target.dataset.editidx !== undefined){
                 openEditRecord(Number(e.target.dataset.editidx));
                 return;
@@ -1612,8 +1641,13 @@
             groups.forEach(g => {
                 html += `
                     <div class="detail-date-group">
-                        <div class="detail-date-title">${escapeHtml(g.date)}（${g.rows.length}条）</div>
-                        ${g.rows.map(r => buildDetailRowHtml(r.item, r.index)).join("")}
+                        <div class="detail-date-title" data-toggle-date="${escapeHtml(g.date)}">
+                            <span>${escapeHtml(g.date)}（${g.rows.length}条）</span>
+                            <span class="detail-date-arrow">▼</span>
+                        </div>
+                        <div class="detail-date-body">
+                            ${g.rows.map(r => buildDetailRowHtml(r.item, r.index)).join("")}
+                        </div>
                     </div>
                 `;
             });

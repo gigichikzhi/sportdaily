@@ -188,6 +188,55 @@
             border-radius: 8px;
             cursor: pointer;
         }
+        .edit-btn {
+            padding: 8px 16px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .record-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: stretch;
+        }
+        .modal-mask {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .modal-mask.open {display: flex;}
+        .modal-card {
+            width: min(520px, 100%);
+            max-height: 90vh;
+            overflow: auto;
+            background: #fff;
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+        }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .modal-actions button {flex: 1;}
+        .cancel-btn {
+            padding: 14px 0;
+            background: #e2e8f0;
+            color: #334155;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
         .check-item {width: 18px;height: 18px;cursor: pointer;}
         .tab-panel {display: none;}
         .tab-panel.active {display: block;}
@@ -495,6 +544,40 @@
         </div>
     </div>
 
+    <div class="modal-mask" id="editRecordModal" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="editRecordTitle">
+            <div class="card-title" id="editRecordTitle">修改运动记录</div>
+            <div class="form-item">
+                <label>打卡日期</label>
+                <input type="date" id="editCheckDate">
+            </div>
+            <div class="form-item">
+                <label>运动类型</label>
+                <select id="editSportType"></select>
+            </div>
+            <div class="form-item">
+                <label>运动时长 (分钟)</label>
+                <input type="number" id="editSportTime" placeholder="请输入时长">
+            </div>
+            <div class="form-item">
+                <label>数量合计 <span class="optional-tag">选填</span></label>
+                <input type="text" id="editSportDist" placeholder="可不填，例如：5公里 / 3组" autocomplete="off">
+            </div>
+            <div class="form-item">
+                <label>最优成绩 <span class="optional-tag">选填</span></label>
+                <input type="text" id="editBestScore" placeholder="可不填，本次最佳成绩记录" autocomplete="off">
+            </div>
+            <div class="form-item">
+                <label>备注 <span class="optional-tag">选填</span></label>
+                <textarea id="editSportNote" rows="4" placeholder="孩子运动状态、天气、进步情况（可不填）"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="cancel-btn" id="btnCancelEditRecord">取消</button>
+                <button type="button" class="submit-cloud-btn" id="btnSaveEditRecord">保存修改</button>
+            </div>
+        </div>
+    </div>
+
 <script>
     function switchAuthTab(){
         const loginForm = document.getElementById("loginForm");
@@ -513,6 +596,7 @@
 
     const tipDom = document.getElementById('tip');
     let sportList = [];
+    let editingRecordIndex = -1;
     let dayChartRange = 7; // 默认近7天，"all" 全部，"custom" 自定义
     let chartCustomStart = "";
     let chartCustomEnd = "";
@@ -1263,6 +1347,60 @@
         await savePersonRecord();
         renderList(); renderDetailList(); renderAllChart();
     }
+    function fillEditSportTypeSelect(selectedType){
+        const sel = document.getElementById("editSportType");
+        const types = (sportTypeList && sportTypeList.length)
+            ? sportTypeList.slice()
+            : DEFAULT_SPORT_TYPES.slice().sort((a,b)=>a.localeCompare(b,"zh"));
+        if(selectedType && !types.includes(selectedType)){
+            types.push(selectedType);
+            types.sort((a,b)=>a.localeCompare(b,"zh"));
+        }
+        sel.innerHTML = types.map(s=>`<option value="${s}">${s}</option>`).join("");
+        sel.value = selectedType && types.includes(selectedType) ? selectedType : (types[0] || "");
+    }
+    function openEditRecord(idx){
+        if(!currentPersonId){ setTip("请先选择孩子", true); return; }
+        const item = sportList[idx];
+        if(!item){ setTip("记录不存在", true); return; }
+        editingRecordIndex = idx;
+        fillEditSportTypeSelect(item.type || "");
+        document.getElementById("editCheckDate").value = item.date || getTodayDate();
+        document.getElementById("editSportTime").value = item.time || "";
+        document.getElementById("editSportDist").value = item.dist || "";
+        document.getElementById("editBestScore").value = item.bestScore || "";
+        document.getElementById("editSportNote").value = item.note || "";
+        const modal = document.getElementById("editRecordModal");
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+    }
+    function closeEditRecord(){
+        editingRecordIndex = -1;
+        const modal = document.getElementById("editRecordModal");
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+    }
+    async function saveEditRecord(){
+        if(editingRecordIndex < 0 || !sportList[editingRecordIndex]){
+            setTip("没有可修改的记录", true);
+            return;
+        }
+        const type = document.getElementById("editSportType").value;
+        const date = document.getElementById("editCheckDate").value;
+        const time = document.getElementById("editSportTime").value.trim();
+        const dist = document.getElementById("editSportDist").value.trim();
+        const bestScore = document.getElementById("editBestScore").value.trim();
+        const note = document.getElementById("editSportNote").value.trim();
+        if(!time){ setTip("请填写运动时长", true); return; }
+        if(!date){ setTip("请选择打卡日期", true); return; }
+        sportList[editingRecordIndex] = { type, time, dist, bestScore, note, date };
+        const ok = await savePersonRecord();
+        if(ok){
+            closeEditRecord();
+            renderList(); renderDetailList(); renderAllChart();
+            setTip(`修改成功：${type} ${time}分钟`);
+        }
+    }
     async function batchDelete(){
         const chks = document.querySelectorAll(".check-item:checked");
         if(chks.length===0){setTip("请勾选要删除的记录",true);return;}
@@ -1281,17 +1419,24 @@
             html += `
                 <div class="list-item">
                     <div>
-                        <div>打卡日期：${item.date}</div>
-                        <div>项目：${item.type} | 时长：${item.time}分钟</div>
-                        <div>数量合计：${item.dist||"无"} | 最优成绩：${item.bestScore||"无"}</div>
-                        <div>备注：${item.note||"无"}</div>
+                        <div>打卡日期：${escapeHtml(item.date)}</div>
+                        <div>项目：${escapeHtml(item.type)} | 时长：${escapeHtml(item.time)}分钟</div>
+                        <div>数量合计：${escapeHtml(item.dist||"无")} | 最优成绩：${escapeHtml(item.bestScore||"无")}</div>
+                        <div>备注：${escapeHtml(item.note||"无")}</div>
                     </div>
-                    <button class="del-btn" data-delidx="${i}">删除本条</button>
+                    <div class="record-actions">
+                        <button type="button" class="edit-btn" data-editidx="${i}">修改</button>
+                        <button type="button" class="del-btn" data-delidx="${i}">删除本条</button>
+                    </div>
                 </div>
             `
         })
         wrap.innerHTML = html;
         wrap.onclick = function(e){
+            if(e.target.dataset.editidx !== undefined){
+                openEditRecord(Number(e.target.dataset.editidx));
+                return;
+            }
             const idx = e.target.dataset.delidx;
             if(idx !== undefined) delRecord(Number(idx));
         }
@@ -1305,17 +1450,24 @@
                 <div class="list-item-with-check">
                     <input type="checkbox" class="check-item" value="${i}">
                     <div style="flex:1;">
-                        <div>打卡日期：${item.date}</div>
-                        <div>项目：${item.type} | 时长：${item.time}分钟</div>
-                        <div>数量合计：${item.dist||"无"} | 最优成绩：${item.bestScore||"无"}</div>
-                        <div>备注：${item.note||"无"}</div>
+                        <div>打卡日期：${escapeHtml(item.date)}</div>
+                        <div>项目：${escapeHtml(item.type)} | 时长：${escapeHtml(item.time)}分钟</div>
+                        <div>数量合计：${escapeHtml(item.dist||"无")} | 最优成绩：${escapeHtml(item.bestScore||"无")}</div>
+                        <div>备注：${escapeHtml(item.note||"无")}</div>
                     </div>
-                    <button class="del-btn" data-delidx="${i}">删除</button>
+                    <div class="record-actions">
+                        <button type="button" class="edit-btn" data-editidx="${i}">修改</button>
+                        <button type="button" class="del-btn" data-delidx="${i}">删除</button>
+                    </div>
                 </div>
             `
         })
         wrap.innerHTML = html;
         wrap.onclick = function(e){
+            if(e.target.dataset.editidx !== undefined){
+                openEditRecord(Number(e.target.dataset.editidx));
+                return;
+            }
             const idx = e.target.dataset.delidx;
             if(idx !== undefined) delRecord(Number(idx));
         }
@@ -1669,6 +1821,11 @@
     document.getElementById("btnDoBind").onclick = bindPerson;
     document.getElementById("btnAddRecord").onclick = addSportRecord;
     document.getElementById("btnAddSportType").onclick = addCustomSportType;
+    document.getElementById("btnSaveEditRecord").onclick = saveEditRecord;
+    document.getElementById("btnCancelEditRecord").onclick = closeEditRecord;
+    document.getElementById("editRecordModal").addEventListener("click", (e)=>{
+        if(e.target.id === "editRecordModal") closeEditRecord();
+    });
     document.getElementById("btnExport").onclick = exportExcel;
     document.getElementById("btnBatchDel").onclick = batchDelete;
     document.querySelectorAll("#dayRangeBtns .chart-switch-btn[data-day-range]").forEach(b=>{

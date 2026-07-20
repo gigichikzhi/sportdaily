@@ -149,6 +149,8 @@
         .blue-btn {background: #2563eb;}
         .red-btn {background: #ef4444;}
         .green-btn {background: #16a34a;}
+        .person-mode-btn {background: #86efac; color: #14532d;}
+        .person-mode-btn.active {background: #15803d; color: #fff;}
         .list-item {
             padding: 16px;
             border: 1px solid #e2e8f0;
@@ -378,8 +380,8 @@
             </button>
             <div class="collapse-body" id="personManageBody" style="display:none;">
                 <div style="display:flex;gap:12px;margin-bottom:16px;">
-                    <button class="action-btn green-btn" id="btnCreatePerson">新建孩子</button>
-                    <button class="action-btn blue-btn" id="btnBindPerson">通过ID绑定孩子</button>
+                    <button class="action-btn person-mode-btn" id="btnCreatePerson" type="button">新建孩子</button>
+                    <button class="action-btn person-mode-btn" id="btnBindPerson" type="button">通过ID绑定孩子</button>
                 </div>
                 <div id="personListWrap"></div>
                 <div id="createPersonForm" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #eee;">
@@ -923,15 +925,24 @@
         setTip(`已选择孩子：${name}`);
     }
 
+    function setPersonMode(mode){
+        const createBtn = document.getElementById("btnCreatePerson");
+        const bindBtn = document.getElementById("btnBindPerson");
+        const createForm = document.getElementById("createPersonForm");
+        const bindForm = document.getElementById("bindPersonForm");
+        const isCreate = mode === "create";
+        createBtn.classList.toggle("active", isCreate);
+        bindBtn.classList.toggle("active", !isCreate);
+        createForm.style.display = isCreate ? "block" : "none";
+        bindForm.style.display = isCreate ? "none" : "block";
+    }
     function openCreatePerson(){
         setPersonManageExpanded(true);
-        document.getElementById("createPersonForm").style.display = "block";
-        document.getElementById("bindPersonForm").style.display = "none";
+        setPersonMode("create");
     }
     function bindPersonById(){
         setPersonManageExpanded(true);
-        document.getElementById("bindPersonForm").style.display = "block";
-        document.getElementById("createPersonForm").style.display = "none";
+        setPersonMode("bind");
     }
 
     async function createNewPerson(){

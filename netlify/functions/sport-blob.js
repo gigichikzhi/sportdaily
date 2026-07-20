@@ -1,5 +1,13 @@
 import { getStore } from "@netlify/blobs";
 
+const NO_CACHE_HEADERS = {
+    "Cache-Control": "no-store, max-age=0",
+};
+
+function jsonResponse(data, status = 200) {
+    return Response.json(data, { status, headers: NO_CACHE_HEADERS });
+}
+
 async function readJSON(store, key, fallback) {
     try {
         const raw = await store.get(key);
@@ -38,12 +46,12 @@ export default async (req, context) => {
         if (mode === "getUser" || mode === "saveUser") {
             if (req.method === "GET") {
                 const userMap = await readJSON(store, "userMap", {});
-                return Response.json({ userMap });
+                return jsonResponse({ userMap });
             }
             if (req.method === "POST") {
                 const userMap = body.userMap || {};
                 await store.setJSON("userMap", userMap);
-                return Response.json({ success: true });
+                return jsonResponse({ success: true });
             }
         }
 
@@ -54,7 +62,7 @@ export default async (req, context) => {
                 const bindPids = user
                     ? await readJSON(store, `bind_${user}`, [])
                     : [];
-                return Response.json({ allPersons, bindPids });
+                return jsonResponse({ allPersons, bindPids });
             }
             if (req.method === "POST") {
                 const { allPersons, bindPids } = body;
@@ -62,7 +70,7 @@ export default async (req, context) => {
                 if (user) {
                     await store.setJSON(`bind_${user}`, bindPids || []);
                 }
-                return Response.json({ success: true });
+                return jsonResponse({ success: true });
             }
         }
 
@@ -83,26 +91,29 @@ export default async (req, context) => {
                     );
                 }
             }
-            return Response.json({ success: true });
+            return jsonResponse({ success: true });
         }
 
         // 3. 运动记录
         const recKey = `rec_${pid}`;
         if (req.method === "GET") {
             const data = await readJSON(store, recKey, []);
-            return Response.json({ data });
+            return jsonResponse({ data });
         }
         if (req.method === "POST") {
             await store.setJSON(recKey, body.list || []);
-            return Response.json({ success: true });
+            return jsonResponse({ success: true });
         }
 
-        return new Response("Method Not Allowed", { status: 405 });
+        return new Response("Method Not Allowed", {
+            status: 405,
+            headers: NO_CACHE_HEADERS,
+        });
     } catch (err) {
         console.error(err);
-        return Response.json(
+        return jsonResponse(
             { success: false, error: err.message || String(err) },
-            { status: 500 }
+            500
         );
     }
 };

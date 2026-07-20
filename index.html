@@ -50,6 +50,37 @@
             border-radius: 6px;
             cursor: pointer;
         }
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .admin-table th,
+        .admin-table td {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 10px 8px;
+            text-align: left;
+            vertical-align: middle;
+        }
+        .admin-table th {color: #64748b; font-weight: 600;}
+        .admin-table input[type="text"],
+        .admin-table input[type="password"] {
+            width: 100%;
+            min-width: 100px;
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .admin-save-btn {
+            padding: 8px 12px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
         .top-btn-row {
             display: flex;
             gap: 6px;
@@ -292,8 +323,8 @@
             <div class="card-title" style="text-align:center" id="authTitle">账号登录</div>
             <div id="loginForm">
                 <div class="form-item">
-                    <label>手机号</label>
-                    <input type="tel" id="loginPhone" inputmode="numeric" maxlength="11" autocomplete="username" placeholder="请输入11位手机号">
+                    <label>账号</label>
+                    <input type="text" id="loginPhone" autocomplete="username" placeholder="手机号或管理员账号">
                 </div>
                 <div class="form-item">
                     <label>密码</label>
@@ -318,6 +349,18 @@
                 <button class="submit-cloud-btn" id="btnRegister">注册账号</button>
                 <button type="button" class="switch-tab-text" id="linkLogin">已有账号？去登录</button>
             </div>
+        </div>
+    </div>
+
+    <div id="adminPanel" style="display:none;">
+        <div class="user-bar">
+            <span>管理员：<b id="adminUserName">admin</b></span>
+            <button class="logout-btn" id="btnAdminLogout">退出登录</button>
+        </div>
+        <div class="card">
+            <div class="card-title">用户账号管理</div>
+            <p style="color:#64748b;font-size:14px;margin-bottom:14px;">可查看全部用户账号与密码，并直接修改密码。</p>
+            <div id="adminUserListWrap"></div>
         </div>
     </div>
 
@@ -498,6 +541,19 @@
     function genPersonId(){
         return "PID_"+Date.now()+"_"+Math.floor(Math.random()*1000);
     }
+    const ADMIN_USER = "admin";
+    const ADMIN_PWD = "admin";
+
+    function isAdminAccount(user){
+        return String(user || "").trim() === ADMIN_USER;
+    }
+    function escapeHtml(text){
+        return String(text || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
     function normalizePhone(phone){
         return String(phone || "").replace(/\D/g, "");
     }
@@ -514,15 +570,110 @@
         const json = await res.json();
         return json.userMap || {};
     }
+    async function saveUserMap(userMap){
+        if(isLocalEnv){
+            localStorage.setItem(STORAGE_KEYS.allUser, JSON.stringify(userMap));
+            return;
+        }
+        const saveRes = await fetch("/api/sport?mode=saveUser",{
+            method:"POST",
+            cache: "no-store",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({mode:"saveUser", userMap})
+        });
+        if(!saveRes.ok) throw new Error(`保存失败(${saveRes.status})`);
+        const saveJson = await saveRes.json().catch(() => ({}));
+        if(saveJson.success === false) throw new Error(saveJson.error || "保存失败");
+    }
+    function showAuthOnly(){
+        document.getElementById("authPanel").style.display = "block";
+        document.getElementById("mainPanel").style.display = "none";
+        document.getElementById("adminPanel").style.display = "none";
+    }
     async function enterApp(phone){
         currentUser = phone;
         localStorage.setItem(STORAGE_KEYS.loginUser, phone);
         document.getElementById("currentUserName").innerText = phone;
         document.getElementById("authPanel").style.display = "none";
+        document.getElementById("adminPanel").style.display = "none";
         document.getElementById("mainPanel").style.display = "block";
         document.getElementById("checkDate").value = getTodayDate();
         initSportTypeSelect();
         await loadAllPersonData();
+    }
+    async function enterAdmin(){
+        currentUser = ADMIN_USER;
+        currentPersonId = "";
+        localStorage.setItem(STORAGE_KEYS.loginUser, ADMIN_USER);
+        document.getElementById("authPanel").style.display = "none";
+        document.getElementById("mainPanel").style.display = "none";
+        document.getElementById("adminPanel").style.display = "block";
+        document.getElementById("pageTitle").innerText = "萌娃运动打卡 - 管理员";
+        await renderAdminUserList();
+    }
+    async function renderAdminUserList(){
+        const wrap = document.getElementById("adminUserListWrap");
+        try{
+            const userMap = await fetchUserMap();
+            const entries = Object.entries(userMap)
+                .filter(([account]) => !isAdminAccount(account))
+                .sort((a, b) => String(a[0]).localeCompare(String(b[0]), "zh"));
+            if(!entries.length){
+                wrap.innerHTML = `<div style="color:#94a3b8;padding:8px 0;">暂无普通用户账号</div>`;
+                return;
+            }
+            wrap.innerHTML = `
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th style="width:34%">手机号</th>
+                            <th style="width:40%">密码</th>
+                            <th style="width:26%">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${entries.map(([phone, pwd]) => `
+                            <tr data-phone="${escapeHtml(phone)}">
+                                <td>${escapeHtml(phone)}</td>
+                                <td>
+                                    <input type="text" class="admin-pwd-input" value="${escapeHtml(pwd)}" autocomplete="off">
+                                </td>
+                                <td>
+                                    <button type="button" class="admin-save-btn" data-phone="${escapeHtml(phone)}">保存密码</button>
+                                </td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            `;
+            wrap.querySelectorAll(".admin-save-btn").forEach(btn => {
+                btn.onclick = () => adminSavePassword(btn.dataset.phone);
+            });
+        }catch(err){
+            console.error(err);
+            wrap.innerHTML = `<div class="tip-error">加载用户失败：${err.message || "请稍后重试"}</div>`;
+        }
+    }
+    async function adminSavePassword(phone){
+        const row = document.querySelector(`#adminUserListWrap tr[data-phone="${phone}"]`);
+        if(!row) return;
+        const pwd = row.querySelector(".admin-pwd-input").value.trim();
+        if(pwd.length < 6){ setTip("密码至少6位", true); return; }
+        try{
+            const userMap = await fetchUserMap();
+            if(!userMap[phone]){
+                setTip("该账号不存在或已被删除", true);
+                await renderAdminUserList();
+                return;
+            }
+            userMap[phone] = pwd;
+            await saveUserMap(userMap);
+            setTip(`已更新 ${phone} 的密码`);
+            await renderAdminUserList();
+        }catch(err){
+            console.error(err);
+            setTip(`保存失败：${err.message || "请稍后重试"}`, true);
+        }
     }
 
     function setTip(text, isErr=false){
@@ -560,6 +711,9 @@
         const phone = normalizePhone(document.getElementById("regPhone").value);
         const pwd1 = document.getElementById("regPwd").value.trim();
         const pwd2 = document.getElementById("regPwd2").value.trim();
+        if(isAdminAccount(phone) || isAdminAccount(document.getElementById("regPhone").value.trim())){
+            setTip("该账号名不可用于注册",true);return;
+        }
         if(!checkPhone(phone)){setTip("请输入合法11位手机号",true);return;}
         if(pwd1.length < 6){setTip("密码至少6位",true);return;}
         if(pwd1 !== pwd2){setTip("两次输入密码不一致",true);return;}
@@ -567,19 +721,7 @@
             const userMap = await fetchUserMap();
             if(userMap[phone]){setTip("该手机号已注册，请直接登录",true);return;}
             userMap[phone] = pwd1;
-            if(isLocalEnv){
-                localStorage.setItem(STORAGE_KEYS.allUser, JSON.stringify(userMap));
-            }else{
-                const saveRes = await fetch("/api/sport?mode=saveUser",{
-                    method:"POST",
-                    cache: "no-store",
-                    headers:{"Content-Type":"application/json"},
-                    body:JSON.stringify({mode:"saveUser", userMap})
-                });
-                if(!saveRes.ok) throw new Error(`保存失败(${saveRes.status})`);
-                const saveJson = await saveRes.json().catch(() => ({}));
-                if(saveJson.success === false) throw new Error(saveJson.error || "保存失败");
-            }
+            await saveUserMap(userMap);
             document.getElementById("regPhone").value = "";
             document.getElementById("regPwd").value = "";
             document.getElementById("regPwd2").value = "";
@@ -594,11 +736,22 @@
     }
 
     async function userLogin(){
-        const phone = normalizePhone(document.getElementById("loginPhone").value);
+        const account = document.getElementById("loginPhone").value.trim();
         const pwd = document.getElementById("loginPwd").value.trim();
-        if(!checkPhone(phone)){setTip("请输入合法11位手机号",true);return;}
+        if(!account){setTip("请输入账号",true);return;}
         if(!pwd){setTip("请输入密码",true);return;}
         try{
+            if(isAdminAccount(account)){
+                if(pwd !== ADMIN_PWD){
+                    setTip("密码错误，请重新输入",true);
+                    return;
+                }
+                await enterAdmin();
+                setTip("管理员登录成功");
+                return;
+            }
+            const phone = normalizePhone(account);
+            if(!checkPhone(phone)){setTip("请输入合法11位手机号",true);return;}
             const userMap = await fetchUserMap();
             if(!userMap[phone]){
                 setTip("该手机号未注册，请先注册",true);
@@ -619,8 +772,7 @@
     function logout(){
         currentUser = ""; currentPersonId = ""; sportList=[];
         localStorage.removeItem(STORAGE_KEYS.loginUser);
-        document.getElementById("authPanel").style.display = "block";
-        document.getElementById("mainPanel").style.display = "none";
+        showAuthOnly();
         updatePageTitle();
         setTip("已退出登录");
     }
@@ -1342,6 +1494,7 @@
     document.getElementById("btnLogin").onclick = userLogin;
     document.getElementById("btnRegister").onclick = userRegister;
     document.getElementById("btnLogout").onclick = logout;
+    document.getElementById("btnAdminLogout").onclick = logout;
     document.getElementById("btnTogglePersonManage").onclick = togglePersonManage;
     document.getElementById("btnCreatePerson").onclick = openCreatePerson;
     document.getElementById("btnBindPerson").onclick = bindPersonById;
@@ -1360,18 +1513,26 @@
         initSportTypeSelect();
         try {
             const savedUser = localStorage.getItem(STORAGE_KEYS.loginUser);
-            const allUserRaw = localStorage.getItem(STORAGE_KEYS.allUser) || "{}";
-            const allUserObj = JSON.parse(allUserRaw);
-            if (savedUser && Object.keys(allUserObj).includes(savedUser)) {
-                currentUser = savedUser;
-                document.getElementById("currentUserName").innerText = currentUser;
-                document.getElementById("authPanel").style.display = "none";
-                document.getElementById("mainPanel").style.display = "block";
-                initSportTypeSelect();
-                await loadAllPersonData();
-            } else {
-                setTip("请登录账号查看");
+            if (isAdminAccount(savedUser)) {
+                await enterAdmin();
+                setTip("管理员已登录");
+                return;
             }
+            if (savedUser && checkPhone(normalizePhone(savedUser))) {
+                // 线上以云端账号为准；本地环境再校验本地 userMap
+                if (isLocalEnv) {
+                    const allUserRaw = localStorage.getItem(STORAGE_KEYS.allUser) || "{}";
+                    const allUserObj = JSON.parse(allUserRaw);
+                    if (!Object.keys(allUserObj).includes(savedUser)) {
+                        setTip("请登录账号查看");
+                        return;
+                    }
+                }
+                await enterApp(normalizePhone(savedUser));
+                setTip(`欢迎回来：${normalizePhone(savedUser)}`);
+                return;
+            }
+            setTip("请登录账号查看");
         } catch (err) {
             setTip("页面加载完成，请登录账号");
             console.error(err);

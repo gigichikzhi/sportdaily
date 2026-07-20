@@ -1730,17 +1730,13 @@
             dayMap[it.date][s] = (dayMap[it.date][s]||0) + (Number(it.time)||0);
         });
         const sportArr = Array.from(sportTypes);
-        const colorMap = {
-            "跑步":"#f97316","骑自行车":"#2563eb","爬山":"#16a34a","羽毛球":"#eab308",
-            "徒步":"#0d9488","游泳":"#06b6d4","跳绳":"#ec4899","跳操":"#8b5cf6","其他":"#64748b"
-        };
-        const fallback = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"];
+        const colorBySport = buildSportColorLookup(sportArr);
         const totals = dates.map(d=>sportArr.reduce((sum,sp)=>sum+(dayMap[d][sp]||0),0));
         const datasets = sportArr.length
-            ? sportArr.map((sp,idx)=>({
+            ? sportArr.map((sp)=>({
                 label: sp,
                 data: dates.map(d=>dayMap[d][sp]||0),
-                backgroundColor: colorMap[sp] || fallback[idx % fallback.length],
+                backgroundColor: colorBySport[sp] || "#64748b",
                 stack: "day",
                 maxBarThickness: 32,
                 borderWidth: 0,
@@ -1826,7 +1822,29 @@
         "游泳":"#06b6d4",
         "跳绳":"#ec4899",
         "跳操":"#8b5cf6",
+        "其他":"#64748b",
     };
+    const SPORT_COLOR_FALLBACK = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"];
+    function buildSportColorLookup(sportArr){
+        const lookup = {};
+        (sportArr || []).forEach((sp, idx)=>{
+            lookup[sp] = SPORT_COLOR_MAP[sp] || SPORT_COLOR_FALLBACK[idx % SPORT_COLOR_FALLBACK.length];
+        });
+        return lookup;
+    }
+    function collectSportTypesInChartRange(){
+        const bounds = getChartRangeBounds();
+        const dates = bounds.dates
+            ? bounds.dates
+            : buildDateRange(bounds.start, bounds.end);
+        const dateSet = new Set(dates);
+        const sportTypes = new Set();
+        sportList.forEach(it=>{
+            if(!dateSet.has(it.date)) return;
+            sportTypes.add(it.type || "其他");
+        });
+        return Array.from(sportTypes);
+    }
     function renderSportSummary(){
         const wrap = document.getElementById("sportSummaryWrap");
         sportTypeChartInstances.forEach(c=>{ try{c.destroy();}catch(e){} });
@@ -1846,9 +1864,15 @@
             const dist = (it.dist||"").trim();
             if(dist) bySport[s][d].dists.push(dist);
         });
-        const sports = Object.keys(bySport);
+        // 与上方堆叠图同一套类型顺序和颜色
+        const sportArrForColor = collectSportTypesInChartRange();
+        const colorBySport = buildSportColorLookup(sportArrForColor);
+        const sports = sportArrForColor.filter(sp => bySport[sp]);
+        Object.keys(bySport).forEach(sp=>{
+            if(!sports.includes(sp)) sports.push(sp);
+        });
         wrap.innerHTML = sports.map((sp,idx)=>{
-            const color = SPORT_COLOR_MAP[sp] || "#64748b";
+            const color = colorBySport[sp] || SPORT_COLOR_FALLBACK[idx % SPORT_COLOR_FALLBACK.length];
             return `
                 <div class="sport-type-chart-block">
                     <div class="sport-type-chart-title" style="color:${color}">${sp}</div>
@@ -1862,7 +1886,7 @@
             const dates = Object.keys(dayMap).sort(); // 仅有该运动的日期
             const times = dates.map(d=>dayMap[d].time);
             const qtyLabels = dates.map(d=>dayMap[d].dists.length ? dayMap[d].dists.join("、") : "");
-            const color = SPORT_COLOR_MAP[sp] || "#64748b";
+            const color = colorBySport[sp] || SPORT_COLOR_FALLBACK[idx % SPORT_COLOR_FALLBACK.length];
             const canvas = document.getElementById(`sportTypeChart_${idx}`);
             if(!canvas) return;
             const chart = new Chart(canvas.getContext("2d"),{

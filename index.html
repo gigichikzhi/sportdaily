@@ -586,18 +586,25 @@
         const json = await res.json().catch(() => ({}));
         if(json.success === false) throw new Error(json.error || "保存失败");
     }
-    async function initSportTypeSelect(preferredType){
+    async function initSportTypeSelect(preferredType, customTypesOverride){
         const sel = document.getElementById("sportType");
         if(!sel) return;
         try{
-            const customTypes = await fetchCustomSportTypes();
+            const customTypes = customTypesOverride !== undefined
+                ? customTypesOverride
+                : await fetchCustomSportTypes();
             sportTypeList = mergeSportTypes(customTypes);
         }catch(err){
             console.error(err);
             sportTypeList = DEFAULT_SPORT_TYPES.slice().sort((a,b)=>a.localeCompare(b,"zh"));
         }
+        const preferred = String(preferredType || "").trim();
+        if(preferred && !sportTypeList.includes(preferred)){
+            sportTypeList.push(preferred);
+            sportTypeList.sort((a,b)=>a.localeCompare(b,"zh"));
+        }
         sel.innerHTML = sportTypeList.map(s=>`<option value="${s}">${s}</option>`).join("");
-        const last = preferredType
+        const last = preferred
             || (currentUser ? localStorage.getItem(STORAGE_KEYS.lastSportType(currentUser)) : "");
         sel.value = (last && sportTypeList.includes(last)) ? last : (sportTypeList[0] || "");
     }
@@ -622,7 +629,7 @@
         const allTypes = mergeSportTypes(customTypes);
         if(allTypes.includes(name)){
             setTip(`「${name}」已存在，无需重复添加`, true);
-            document.getElementById("sportType").value = name;
+            await initSportTypeSelect(name, customTypes);
             return;
         }
         const similar = findSimilarSportTypes(name, allTypes);
@@ -632,9 +639,10 @@
         if(!ok) return;
 
         try{
-            customTypes.push(name);
-            await saveCustomSportTypes(customTypes);
-            await initSportTypeSelect(name);
+            const nextCustomTypes = customTypes.concat([name]);
+            await saveCustomSportTypes(nextCustomTypes);
+            // 用本地已确认列表立刻刷新，避免保存后马上读云端拿到旧数据
+            await initSportTypeSelect(name, nextCustomTypes);
             localStorage.setItem(STORAGE_KEYS.lastSportType(currentUser), name);
             setTip(`已添加运动类型：${name}`);
         }catch(err){

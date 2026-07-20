@@ -699,7 +699,7 @@
             const target = allPersons.find(p => p.personId === currentPersonId);
             titleEl.innerText = target ? `萌娃运动打卡 - ${target.name}` : "萌娃运动打卡";
         } else {
-            fetch(`/api/sport?mode=person&user=${currentUser}`)
+            fetch(`/api/sport?mode=person&user=${encodeURIComponent(currentUser)}`, { cache: "no-store" })
                 .then(res => res.json())
                 .then(json => {
                     const all = json.allPersons || [];
@@ -779,17 +779,36 @@
         setTip("已退出登录");
     }
 
+    async function fetchPersonData(){
+        if(isLocalEnv){
+            return {
+                allPersons: JSON.parse(localStorage.getItem(STORAGE_KEYS.allPersons) || "[]"),
+                bindPids: JSON.parse(localStorage.getItem(STORAGE_KEYS.userBindPersons(currentUser)) || "[]")
+            };
+        }
+        const res = await fetch(`/api/sport?mode=person&user=${encodeURIComponent(currentUser)}`, {
+            cache: "no-store"
+        });
+        if(!res.ok) throw new Error(`服务异常(${res.status})`);
+        const json = await res.json();
+        return {
+            allPersons: json.allPersons || [],
+            bindPids: json.bindPids || []
+        };
+    }
+
     async function loadAllPersonData(){
         let allPersons = [];
         let bindPids = [];
-        if(isLocalEnv){
-            allPersons = JSON.parse(localStorage.getItem(STORAGE_KEYS.allPersons) || "[]");
-            bindPids = JSON.parse(localStorage.getItem(STORAGE_KEYS.userBindPersons(currentUser)) || "[]");
-        }else{
-            const res = await fetch(`/api/sport?mode=person&user=${currentUser}`);
-            const json = await res.json();
-            allPersons = json.allPersons || [];
-            bindPids = json.bindPids || [];
+        try{
+            const data = await fetchPersonData();
+            allPersons = data.allPersons;
+            bindPids = data.bindPids;
+        }catch(err){
+            console.error(err);
+            setTip(`加载孩子列表失败：${err.message || "请稍后重试"}`, true);
+            renderPersonList([], []);
+            return;
         }
         const bindPersonArr = allPersons.filter(p=>bindPids.includes(p.personId));
         const targetId = resolveDefaultPersonId(bindPersonArr);
@@ -908,21 +927,16 @@
         localStorage.setItem(STORAGE_KEYS.lastPerson(currentUser), pid);
         await loadPersonRecord();
         renderList(); renderDetailList(); renderAllChart();
-        let allPersons = [];
-        let bindPids = [];
-        if(isLocalEnv){
-            allPersons = JSON.parse(localStorage.getItem(STORAGE_KEYS.allPersons) || "[]");
-            bindPids = JSON.parse(localStorage.getItem(STORAGE_KEYS.userBindPersons(currentUser)) || "[]");
-        }else{
-            const res = await fetch(`/api/sport?mode=person&user=${currentUser}`);
-            const json = await res.json();
-            allPersons = json.allPersons || [];
-            bindPids = json.bindPids || [];
+        try{
+            const { allPersons, bindPids } = await fetchPersonData();
+            renderPersonList(allPersons, bindPids);
+            updatePageTitle();
+            const name = allPersons.find(p=>p.personId===pid)?.name || "";
+            setTip(`已选择孩子：${name}`);
+        }catch(err){
+            console.error(err);
+            setTip(`刷新列表失败：${err.message || "请稍后重试"}`, true);
         }
-        renderPersonList(allPersons, bindPids);
-        updatePageTitle();
-        const name = allPersons.find(p=>p.personId===pid)?.name || "";
-        setTip(`已选择孩子：${name}`);
     }
 
     function setPersonMode(mode){
@@ -955,84 +969,108 @@
             createUser: currentUser,
             createTime: new Date().toLocaleString()
         };
-        let allPersons = isLocalEnv
-            ? JSON.parse(localStorage.getItem(STORAGE_KEYS.allPersons) || "[]")
-            : (await (await fetch(`/api/sport?mode=person&user=${currentUser}`)).json()).allPersons || [];
-        allPersons.push(newPerson);
-        let bindPids = isLocalEnv
-            ? JSON.parse(localStorage.getItem(STORAGE_KEYS.userBindPersons(currentUser)) || "[]")
-            : (await (await fetch(`/api/sport?mode=person&user=${currentUser}`)).json()).bindPids || [];
-        bindPids.push(pid);
-        if(isLocalEnv){
-            localStorage.setItem(STORAGE_KEYS.allPersons, JSON.stringify(allPersons));
-            localStorage.setItem(STORAGE_KEYS.userBindPersons(currentUser), JSON.stringify(bindPids));
-        }else{
-            await fetch("/api/sport", {
-                method:"POST",
-                headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({mode:"person", allPersons, bindPids, user:currentUser})
-            })
+        try{
+            const data = await fetchPersonData();
+            let allPersons = data.allPersons || [];
+            let bindPids = data.bindPids || [];
+            allPersons.push(newPerson);
+            bindPids.push(pid);
+            if(isLocalEnv){
+                localStorage.setItem(STORAGE_KEYS.allPersons, JSON.stringify(allPersons));
+                localStorage.setItem(STORAGE_KEYS.userBindPersons(currentUser), JSON.stringify(bindPids));
+            }else{
+                const saveRes = await fetch("/api/sport?mode=person", {
+                    method:"POST",
+                    cache: "no-store",
+                    headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify({mode:"person", allPersons, bindPids, user:currentUser})
+                });
+                if(!saveRes.ok) throw new Error(`保存失败(${saveRes.status})`);
+            }
+            document.getElementById("newPersonName").value = "";
+            document.getElementById("createPersonForm").style.display = "none";
+            localStorage.setItem(STORAGE_KEYS.lastPerson(currentUser), pid);
+            await loadAllPersonData();
+            setTip(`创建成功，人员ID：${pid}，可复制分享给家人`);
+        }catch(err){
+            console.error(err);
+            setTip(`创建失败：${err.message || "请稍后重试"}`, true);
         }
-        document.getElementById("newPersonName").value = "";
-        document.getElementById("createPersonForm").style.display = "none";
-        localStorage.setItem(STORAGE_KEYS.lastPerson(currentUser), pid);
-        await loadAllPersonData();
-        setTip(`创建成功，人员ID：${pid}，可复制分享给家人`);
     }
 
     async function bindPerson(){
         const pid = document.getElementById("bindPersonIdInput").value.trim();
         if(!pid){setTip("请输入人员ID",true);return;}
-        let allPersons = isLocalEnv
-            ? JSON.parse(localStorage.getItem(STORAGE_KEYS.allPersons) || "[]")
-            : (await (await fetch(`/api/sport?mode=person&user=${currentUser}`)).json()).allPersons || [];
-        const target = allPersons.find(p=>p.personId === pid);
-        if(!target){setTip("该人员ID不存在，请核对",true);return;}
-        let bindPids = isLocalEnv
-            ? JSON.parse(localStorage.getItem(STORAGE_KEYS.userBindPersons(currentUser)) || "[]")
-            : (await (await fetch(`/api/sport?mode=person&user=${currentUser}`)).json()).bindPids || [];
-        if(bindPids.includes(pid)){setTip("你已绑定该孩子，无需重复操作",true);return;}
-        bindPids.push(pid);
-        if(isLocalEnv){
-            localStorage.setItem(STORAGE_KEYS.userBindPersons(currentUser), JSON.stringify(bindPids));
-        }else{
-            await fetch("/api/sport", {
-                method:"POST",
-                headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({mode:"person", allPersons, bindPids, user:currentUser})
-            })
+        try{
+            const data = await fetchPersonData();
+            let allPersons = data.allPersons || [];
+            const target = allPersons.find(p=>p.personId === pid);
+            if(!target){setTip("该人员ID不存在，请核对",true);return;}
+            let bindPids = data.bindPids || [];
+            if(bindPids.includes(pid)){setTip("你已绑定该孩子，无需重复操作",true);return;}
+            bindPids.push(pid);
+            if(isLocalEnv){
+                localStorage.setItem(STORAGE_KEYS.userBindPersons(currentUser), JSON.stringify(bindPids));
+            }else{
+                const saveRes = await fetch("/api/sport?mode=person", {
+                    method:"POST",
+                    cache: "no-store",
+                    headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify({mode:"person", allPersons, bindPids, user:currentUser})
+                });
+                if(!saveRes.ok) throw new Error(`保存失败(${saveRes.status})`);
+            }
+            document.getElementById("bindPersonIdInput").value = "";
+            document.getElementById("bindPersonForm").style.display = "none";
+            if(!currentPersonId) localStorage.setItem(STORAGE_KEYS.lastPerson(currentUser), pid);
+            await loadAllPersonData();
+            setTip(`绑定成功，现在可查看${target.name}的运动记录`);
+        }catch(err){
+            console.error(err);
+            setTip(`绑定失败：${err.message || "请稍后重试"}`, true);
         }
-        document.getElementById("bindPersonIdInput").value = "";
-        document.getElementById("bindPersonForm").style.display = "none";
-        if(!currentPersonId) localStorage.setItem(STORAGE_KEYS.lastPerson(currentUser), pid);
-        await loadAllPersonData();
-        setTip(`绑定成功，现在可查看${target.name}的运动记录`);
     }
 
     async function deletePerson(pid){
         if(!confirm("删除后该孩子所有运动记录将全部清除，确定？")) return;
-        let allPersons = isLocalEnv
-            ? JSON.parse(localStorage.getItem(STORAGE_KEYS.allPersons) || "[]")
-            : (await (await fetch(`/api/sport?mode=person&user=${currentUser}`)).json()).allPersons || [];
-        allPersons = allPersons.filter(p=>p.personId !== pid);
-        if(isLocalEnv){
-            localStorage.setItem(STORAGE_KEYS.allPersons, JSON.stringify(allPersons));
-            localStorage.removeItem(STORAGE_KEYS.personRecords(pid));
-        }else{
-            await fetch("/api/sport", {
-                method:"POST",
-                headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({mode:"delPerson", delPid:pid, allPersons, user:currentUser})
-            })
+        try{
+            const data = await fetchPersonData();
+            let allPersons = (data.allPersons || []).filter(p=>p.personId !== pid);
+            let bindPids = (data.bindPids || []).filter(id => id !== pid);
+            if(isLocalEnv){
+                localStorage.setItem(STORAGE_KEYS.allPersons, JSON.stringify(allPersons));
+                localStorage.setItem(STORAGE_KEYS.userBindPersons(currentUser), JSON.stringify(bindPids));
+                localStorage.removeItem(STORAGE_KEYS.personRecords(pid));
+            }else{
+                const delRes = await fetch("/api/sport?mode=delPerson", {
+                    method:"POST",
+                    cache: "no-store",
+                    headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify({mode:"delPerson", delPid:pid, allPersons, user:currentUser})
+                });
+                if(!delRes.ok) throw new Error(`删除失败(${delRes.status})`);
+                const delJson = await delRes.json().catch(() => ({}));
+                if(delJson.success === false) throw new Error(delJson.error || "删除失败");
+            }
+            if(currentPersonId === pid){
+                currentPersonId = "";
+                sportList = [];
+                renderList(); renderDetailList(); renderAllChart();
+            }
+            const last = localStorage.getItem(STORAGE_KEYS.lastPerson(currentUser));
+            if(last === pid) localStorage.removeItem(STORAGE_KEYS.lastPerson(currentUser));
+
+            // 先用本地结果立刻刷新，避免仍显示已删孩子
+            setPersonManageExpanded(true);
+            renderPersonList(allPersons, bindPids);
+            updatePageTitle();
+
+            await loadAllPersonData();
+            setTip("人员及对应运动记录已删除");
+        }catch(err){
+            console.error(err);
+            setTip(`删除失败：${err.message || "请稍后重试"}`, true);
         }
-        if(currentPersonId === pid){
-            currentPersonId = "";
-            sportList = []; renderList(); renderDetailList(); renderAllChart();
-        }
-        const last = localStorage.getItem(STORAGE_KEYS.lastPerson(currentUser));
-        if(last === pid) localStorage.removeItem(STORAGE_KEYS.lastPerson(currentUser));
-        await loadAllPersonData();
-        setTip("人员及对应运动记录已删除");
     }
 
     async function loadPersonRecord(){

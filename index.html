@@ -202,6 +202,59 @@
             gap: 8px;
             align-items: stretch;
         }
+        .detail-toolbar {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .detail-toolbar-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .detail-toolbar-row label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            color: #334155;
+            margin: 0;
+        }
+        .detail-toolbar select,
+        .detail-toolbar input[type="date"] {
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 14px;
+            background: #fff;
+        }
+        .detail-date-group {
+            border: 1px solid #dbeafe;
+            border-radius: 12px;
+            margin-bottom: 14px;
+            overflow: hidden;
+            background: #f8fbff;
+        }
+        .detail-date-title {
+            padding: 10px 14px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-weight: 600;
+            font-size: 15px;
+            border-bottom: 1px solid #dbeafe;
+        }
+        .detail-date-group .list-item-with-check {
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            border-bottom: 1px solid #e2e8f0;
+            background: #fff;
+        }
+        .detail-date-group .list-item-with-check:last-child {
+            border-bottom: none;
+        }
         .modal-mask {
             display: none;
             position: fixed;
@@ -499,18 +552,33 @@
                 </div>
                 <button class="submit-cloud-btn" id="btnAddRecord">保存</button>
             </div>
-            <div class="card">
-                <div class="card-title">运动清单</div>
-                <div id="recordList"></div>
-            </div>
         </div>
 
         <div class="tab-panel" id="detail">
             <div class="card">
                 <div class="card-title">运动明细记录</div>
-                <div style="display:flex; gap:12px; margin-bottom:16px;">
-                    <button class="action-btn blue-btn" id="btnExport">导出到Excel</button>
-                    <button class="action-btn red-btn" id="btnBatchDel">删除选中项</button>
+                <div class="detail-toolbar">
+                    <div class="detail-toolbar-row">
+                        <button class="action-btn blue-btn" id="btnExport" type="button">导出到Excel</button>
+                        <button class="action-btn red-btn" id="btnBatchDel" type="button">删除选中项</button>
+                    </div>
+                    <div class="detail-toolbar-row">
+                        <label><input type="checkbox" id="detailSelectAll"> 全选</label>
+                        <label><input type="checkbox" id="detailMergeByDate" checked> 按日期合并</label>
+                    </div>
+                    <div class="detail-toolbar-row">
+                        <label>运动类型
+                            <select id="detailFilterType">
+                                <option value="">全部类型</option>
+                            </select>
+                        </label>
+                        <label>开始
+                            <input type="date" id="detailStartDate">
+                        </label>
+                        <label>结束
+                            <input type="date" id="detailEndDate">
+                        </label>
+                    </div>
                 </div>
                 <div id="detailRecordList"></div>
             </div>
@@ -1018,11 +1086,11 @@
             currentPersonId = targetId;
             localStorage.setItem(STORAGE_KEYS.lastPerson(currentUser), targetId);
             await loadPersonRecord();
-            renderList(); renderDetailList(); renderAllChart();
+            renderDetailList(); renderAllChart();
         }else{
             currentPersonId = "";
             sportList = [];
-            renderList(); renderDetailList();
+            renderDetailList();
         }
         renderPersonList(allPersons, bindPids);
         updatePageTitle();
@@ -1128,7 +1196,7 @@
         currentPersonId = pid;
         localStorage.setItem(STORAGE_KEYS.lastPerson(currentUser), pid);
         await loadPersonRecord();
-        renderList(); renderDetailList(); renderAllChart();
+        renderDetailList(); renderAllChart();
         try{
             const { allPersons, bindPids } = await fetchPersonData();
             renderPersonList(allPersons, bindPids);
@@ -1257,7 +1325,7 @@
             if(currentPersonId === pid){
                 currentPersonId = "";
                 sportList = [];
-                renderList(); renderDetailList(); renderAllChart();
+                renderDetailList(); renderAllChart();
             }
             const last = localStorage.getItem(STORAGE_KEYS.lastPerson(currentUser));
             if(last === pid) localStorage.removeItem(STORAGE_KEYS.lastPerson(currentUser));
@@ -1337,7 +1405,7 @@
             document.getElementById('bestScore').value = "";
             document.getElementById('sportNote').value = "";
             document.getElementById('checkDate').value = getTodayDate();
-            renderList(); renderDetailList(); renderAllChart();
+            renderDetailList(); renderAllChart();
             setTip(`保存成功：${type} ${time}分钟`);
         }
     }
@@ -1345,7 +1413,7 @@
     async function delRecord(idx){
         sportList.splice(idx,1);
         await savePersonRecord();
-        renderList(); renderDetailList(); renderAllChart();
+        renderDetailList(); renderAllChart();
     }
     function fillEditSportTypeSelect(selectedType){
         const sel = document.getElementById("editSportType");
@@ -1397,7 +1465,7 @@
         const ok = await savePersonRecord();
         if(ok){
             closeEditRecord();
-            renderList(); renderDetailList(); renderAllChart();
+            renderDetailList(); renderAllChart();
             setTip(`修改成功：${type} ${time}分钟`);
         }
     }
@@ -1407,31 +1475,85 @@
         const idxs = Array.from(chks).map(c=>Number(c.value)).sort((a,b)=>b-a);
         idxs.forEach(i=>sportList.splice(i,1));
         await savePersonRecord();
-        renderList(); renderDetailList(); renderAllChart();
+        renderDetailList(); renderAllChart();
         setTip(`已删除${chks.length}条记录`);
     }
 
-    function renderList(){
-        const wrap = document.getElementById("recordList");
-        if(sportList.length===0){wrap.innerHTML="<p style='color:#64748b;'>暂无运动记录</p>";return;}
-        let html = "";
-        sportList.forEach((item,i)=>{
-            html += `
-                <div class="list-item">
-                    <div>
-                        <div>打卡日期：${escapeHtml(item.date)}</div>
-                        <div>项目：${escapeHtml(item.type)} | 时长：${escapeHtml(item.time)}分钟</div>
-                        <div>数量合计：${escapeHtml(item.dist||"无")} | 最优成绩：${escapeHtml(item.bestScore||"无")}</div>
-                        <div>备注：${escapeHtml(item.note||"无")}</div>
-                    </div>
-                    <div class="record-actions">
-                        <button type="button" class="edit-btn" data-editidx="${i}">修改</button>
-                        <button type="button" class="del-btn" data-delidx="${i}">删除本条</button>
-                    </div>
+    function getMonthAgoDate(){
+        const d = new Date();
+        d.setMonth(d.getMonth() - 1);
+        const y = d.getFullYear();
+        let m = d.getMonth()+1, day = d.getDate();
+        m = m<10?"0"+m:m; day = day<10?"0"+day:day;
+        return `${y}-${m}-${day}`;
+    }
+    function ensureDetailFilterDefaults(){
+        const startEl = document.getElementById("detailStartDate");
+        const endEl = document.getElementById("detailEndDate");
+        if(!startEl || !endEl) return;
+        if(!endEl.value) endEl.value = getTodayDate();
+        if(!startEl.value) startEl.value = getMonthAgoDate();
+    }
+    function fillDetailTypeFilter(){
+        const sel = document.getElementById("detailFilterType");
+        if(!sel) return;
+        const prev = sel.value;
+        const typeSet = new Set(sportTypeList || DEFAULT_SPORT_TYPES);
+        sportList.forEach(it => {
+            if(it && it.type) typeSet.add(it.type);
+        });
+        const types = Array.from(typeSet).sort((a,b)=>a.localeCompare(b,"zh"));
+        sel.innerHTML = "";
+        const allOpt = document.createElement("option");
+        allOpt.value = "";
+        allOpt.textContent = "全部类型";
+        sel.appendChild(allOpt);
+        types.forEach(t => {
+            const opt = document.createElement("option");
+            opt.value = t;
+            opt.textContent = t;
+            sel.appendChild(opt);
+        });
+        sel.value = (prev === "" || types.includes(prev)) ? prev : "";
+    }
+    function getFilteredDetailRows(){
+        ensureDetailFilterDefaults();
+        const typeFilter = document.getElementById("detailFilterType")?.value || "";
+        const start = document.getElementById("detailStartDate")?.value || "";
+        const end = document.getElementById("detailEndDate")?.value || "";
+        const rows = sportList
+            .map((item, index) => ({ item, index }))
+            .filter(({ item }) => {
+                if(!item || !item.date) return false;
+                if(typeFilter && item.type !== typeFilter) return false;
+                if(start && item.date < start) return false;
+                if(end && item.date > end) return false;
+                return true;
+            });
+        rows.sort((a, b) => {
+            if(a.item.date !== b.item.date) return b.item.date.localeCompare(a.item.date);
+            return b.index - a.index;
+        });
+        return rows;
+    }
+    function buildDetailRowHtml(item, index){
+        return `
+            <div class="list-item-with-check">
+                <input type="checkbox" class="check-item" value="${index}">
+                <div style="flex:1;">
+                    <div>打卡日期：${escapeHtml(item.date)}</div>
+                    <div>项目：${escapeHtml(item.type)} | 时长：${escapeHtml(item.time)}分钟</div>
+                    <div>数量合计：${escapeHtml(item.dist||"无")} | 最优成绩：${escapeHtml(item.bestScore||"无")}</div>
+                    <div>备注：${escapeHtml(item.note||"无")}</div>
                 </div>
-            `
-        })
-        wrap.innerHTML = html;
+                <div class="record-actions">
+                    <button type="button" class="edit-btn" data-editidx="${index}">修改</button>
+                    <button type="button" class="del-btn" data-delidx="${index}">删除</button>
+                </div>
+            </div>
+        `;
+    }
+    function bindDetailListEvents(wrap){
         wrap.onclick = function(e){
             if(e.target.dataset.editidx !== undefined){
                 openEditRecord(Number(e.target.dataset.editidx));
@@ -1439,49 +1561,84 @@
             }
             const idx = e.target.dataset.delidx;
             if(idx !== undefined) delRecord(Number(idx));
-        }
+        };
+        wrap.querySelectorAll(".check-item").forEach(chk => {
+            chk.addEventListener("change", syncDetailSelectAllState);
+        });
+    }
+    function syncDetailSelectAllState(){
+        const all = document.querySelectorAll("#detailRecordList .check-item");
+        const checked = document.querySelectorAll("#detailRecordList .check-item:checked");
+        const selectAll = document.getElementById("detailSelectAll");
+        if(!selectAll) return;
+        selectAll.checked = all.length > 0 && all.length === checked.length;
+        selectAll.indeterminate = checked.length > 0 && checked.length < all.length;
+    }
+    function toggleDetailSelectAll(){
+        const checked = document.getElementById("detailSelectAll").checked;
+        document.querySelectorAll("#detailRecordList .check-item").forEach(chk => {
+            chk.checked = checked;
+        });
+        syncDetailSelectAllState();
     }
     function renderDetailList(){
         const wrap = document.getElementById("detailRecordList");
-        if(sportList.length===0){wrap.innerHTML="<p style='color:#64748b;'>暂无运动记录</p>";return;}
-        let html = "";
-        sportList.forEach((item,i)=>{
-            html += `
-                <div class="list-item-with-check">
-                    <input type="checkbox" class="check-item" value="${i}">
-                    <div style="flex:1;">
-                        <div>打卡日期：${escapeHtml(item.date)}</div>
-                        <div>项目：${escapeHtml(item.type)} | 时长：${escapeHtml(item.time)}分钟</div>
-                        <div>数量合计：${escapeHtml(item.dist||"无")} | 最优成绩：${escapeHtml(item.bestScore||"无")}</div>
-                        <div>备注：${escapeHtml(item.note||"无")}</div>
-                    </div>
-                    <div class="record-actions">
-                        <button type="button" class="edit-btn" data-editidx="${i}">修改</button>
-                        <button type="button" class="del-btn" data-delidx="${i}">删除</button>
-                    </div>
-                </div>
-            `
-        })
-        wrap.innerHTML = html;
-        wrap.onclick = function(e){
-            if(e.target.dataset.editidx !== undefined){
-                openEditRecord(Number(e.target.dataset.editidx));
-                return;
-            }
-            const idx = e.target.dataset.delidx;
-            if(idx !== undefined) delRecord(Number(idx));
+        if(!wrap) return;
+        fillDetailTypeFilter();
+        ensureDetailFilterDefaults();
+        const rows = getFilteredDetailRows();
+        const selectAll = document.getElementById("detailSelectAll");
+        if(selectAll){
+            selectAll.checked = false;
+            selectAll.indeterminate = false;
         }
+        if(rows.length===0){
+            wrap.innerHTML = "<p style='color:#64748b;'>暂无符合条件的运动记录</p>";
+            return;
+        }
+        const mergeByDate = document.getElementById("detailMergeByDate")?.checked !== false;
+        let html = "";
+        if(mergeByDate){
+            const groups = [];
+            const map = new Map();
+            rows.forEach(row => {
+                if(!map.has(row.item.date)){
+                    const g = { date: row.item.date, rows: [] };
+                    map.set(row.item.date, g);
+                    groups.push(g);
+                }
+                map.get(row.item.date).rows.push(row);
+            });
+            groups.forEach(g => {
+                html += `
+                    <div class="detail-date-group">
+                        <div class="detail-date-title">${escapeHtml(g.date)}（${g.rows.length}条）</div>
+                        ${g.rows.map(r => buildDetailRowHtml(r.item, r.index)).join("")}
+                    </div>
+                `;
+            });
+        }else{
+            html = rows.map(r => buildDetailRowHtml(r.item, r.index)).join("");
+        }
+        wrap.innerHTML = html;
+        bindDetailListEvents(wrap);
     }
-
     function exportExcel(){
-        if(sportList.length===0){setTip("暂无记录无法导出",true);return;}
+        const chks = document.querySelectorAll("#detailRecordList .check-item:checked");
+        if(chks.length===0){setTip("请先勾选要导出的记录（可用全选）",true);return;}
+        const idxs = Array.from(chks).map(c=>Number(c.value));
         const table = [["打卡日期","运动项目","时长(分钟)","数量合计","最优成绩","备注"]];
-        sportList.forEach(it=>table.push([it.date,it.type,it.time,it.dist||"无",it.bestScore||"无",it.note||"无"]));
+        idxs.forEach(i=>{
+            const it = sportList[i];
+            if(!it) return;
+            table.push([it.date,it.type,it.time,it.dist||"无",it.bestScore||"无",it.note||"无"]);
+        });
+        if(table.length===1){setTip("没有可导出的记录",true);return;}
         const ws = XLSX.utils.aoa_to_sheet(table);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb,ws,"运动记录");
         XLSX.writeFile(wb,"萌娃运动打卡.xlsx");
-        setTip("Excel导出成功");
+        setTip(`Excel导出成功（${table.length-1}条）`);
     }
 
     function switchDayRange(range){
@@ -1803,7 +1960,10 @@
             btn.classList.add("active");
             document.getElementById(tab).classList.add("active");
             if(tab==="chart") renderAllChart();
-            if(tab==="detail") renderDetailList();
+            if(tab==="detail"){
+                ensureDetailFilterDefaults();
+                renderDetailList();
+            }
         }
     })
 
@@ -1828,6 +1988,11 @@
     });
     document.getElementById("btnExport").onclick = exportExcel;
     document.getElementById("btnBatchDel").onclick = batchDelete;
+    document.getElementById("detailSelectAll").onchange = toggleDetailSelectAll;
+    document.getElementById("detailMergeByDate").onchange = renderDetailList;
+    document.getElementById("detailFilterType").onchange = renderDetailList;
+    document.getElementById("detailStartDate").onchange = renderDetailList;
+    document.getElementById("detailEndDate").onchange = renderDetailList;
     document.querySelectorAll("#dayRangeBtns .chart-switch-btn[data-day-range]").forEach(b=>{
         b.onclick = ()=>switchDayRange(b.dataset.dayRange);
     });
@@ -1835,6 +2000,7 @@
 
     window.onload = async ()=>{
         document.getElementById("checkDate").value = getTodayDate();
+        ensureDetailFilterDefaults();
         await initSportTypeSelect();
         try {
             const savedUser = localStorage.getItem(STORAGE_KEYS.loginUser);
